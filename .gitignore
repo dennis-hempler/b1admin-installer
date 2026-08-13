@@ -1,0 +1,37 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+.claude
+.serena
+Notes.md
+
+# Environment variables
+.env
+.env.*
+!.env.sample
+!.env.example
+
+# Secrets — matched by filename at ANY depth.
+# Deliberately not path-anchored: environment directories can be nested
+# (e.g. infrastructure/environments/<customer>/prod/), and an anchored
+# pattern would silently fail to ignore the real secret file there.
+app-config-secret.json
+bootstrap-admin-secret.json
+customer-values.json
+**/app-config-secret.json
+**/bootstrap-admin-secret.json
+**/customer-values.json
+
+# Generated deployment evidence and artifacts
+/deployment/
+infrastructure/debug/
+infrastructure/iam/generated/
+infrastructure/artifacts/

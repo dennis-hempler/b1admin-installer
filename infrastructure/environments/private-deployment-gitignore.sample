@@ -1,0 +1,7 @@
+environments/*/app-config-secret.json
+environments/*/bootstrap-admin-secret.json
+customer-values.json
+deployment/
+*.log
+.DS_Store
+Thumbs.db
