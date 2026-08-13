@@ -251,23 +251,64 @@ export function explainFailure(text) {
 }
 
 export function latestWorkflowRunId(repo) {
+  return listRecentWorkflowRuns(repo)[0]?.databaseId?.toString() || "";
+}
+
+function listRecentWorkflowRuns(repo) {
   const args = [
     "run",
     "list",
     "--workflow",
     "deploy-aws-self-hosted.yml",
     "--limit",
-    "1",
+    "20",
     "--json",
-    "databaseId",
-    "--jq",
-    ".[0].databaseId",
+    "databaseId,createdAt",
   ];
   if (repo) args.push("--repo", repo);
-  return execFileSync("gh", args, {
-    cwd: rootDir,
-    encoding: "utf8",
-    stdio: "pipe",
-    maxBuffer: 1024 * 1024,
-  }).trim();
+  try {
+    const parsed = JSON.parse(execFileSync("gh", args, {
+      cwd: rootDir,
+      encoding: "utf8",
+      stdio: "pipe",
+      maxBuffer: 4 * 1024 * 1024,
+    }));
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Resolves the run id for a dispatch that was just issued.
+ *
+ * GitHub registers dispatched runs asynchronously, so the top of `gh run list` is
+ * often still the *previous* run of this workflow — and a previous run almost always
+ * exists, because the guided flow dispatches preview and then confirm. Selecting by
+ * "newer than the moment we dispatched" and waiting for one to appear avoids watching
+ * the wrong run and downloading its evidence.
+ *
+ * Falls back to the newest run only after the wait elapses, so behavior degrades to
+ * the previous best-effort guess rather than failing the deploy.
+ */
+export function workflowRunIdSince(repo, dispatchedAtMs, { attempts = 10, delayMs = 3000 } = {}) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const candidates = listRecentWorkflowRuns(repo)
+      .filter((run) => {
+        const createdAt = Date.parse(run.createdAt);
+        return Number.isFinite(createdAt) && createdAt >= dispatchedAtMs;
+      })
+      .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+
+    if (candidates.length > 0) {
+      return { runId: candidates[0].databaseId.toString(), correlated: true };
+    }
+    if (attempt < attempts - 1) sleepSync(delayMs);
+  }
+
+  return { runId: latestWorkflowRunId(repo), correlated: false };
+}
+
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }

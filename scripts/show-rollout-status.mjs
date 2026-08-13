@@ -102,11 +102,35 @@ function runPlan(environment, options) {
   }
 
   if (!parsed || typeof parsed !== "object") {
+    // Downstream renderers and aggregators read these fields unconditionally, so this
+    // branch must return the same shape as the success path rather than a partial one.
+    const message = `Could not read the deploy plan for ${environment}.`;
+    const detail = (stderr || stdout || "No output returned.").trim();
     return {
       ok: false,
       environment,
       status: "blocked",
-      errors: [`Could not parse plan output for ${environment}.`, stderr || stdout || "No output returned."],
+      githubFocusedStatus: "blocked",
+      recommendedPath: "none",
+      recommendedReason: message,
+      primaryCommand: "",
+      alternateCommands: [],
+      starterBlockerCount: 0,
+      inputBlockerCount: 0,
+      starterAndInputBlockerCount: 0,
+      localExecutionOk: false,
+      localExecutionBlockerCount: 0,
+      githubActionsExecutionOk: false,
+      githubActionsExecutionBlockerCount: 0,
+      localGithubDispatchOk: false,
+      localGithubDispatchBlockerCount: 0,
+      appConfigSecretFilePresent: false,
+      warnings: [],
+      highlightedBlockers: [message, detail].filter(Boolean),
+      githubFocusedHighlightedBlockers: [message, detail].filter(Boolean),
+      nextSteps: [`Run \`npm run plan:environment-deploy -- --environment=${environment} --output=markdown\` and read the error it prints.`],
+      githubFocusedNextSteps: [`Run \`npm run plan:environment-deploy -- --environment=${environment} --output=markdown\` and read the error it prints.`],
+      errors: [message, detail].filter(Boolean),
     };
   }
 

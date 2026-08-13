@@ -86,7 +86,10 @@ function runAwsJson(args, failureLabel) {
   } catch (error) {
     const stderr = error && typeof error === "object" && "stderr" in error ? String(error.stderr || "") : "";
     const message = error instanceof Error ? error.message : String(error);
-    fail(`${failureLabel}: ${stderr.trim() || message}`);
+    // Must throw rather than exit: a mid-migration failure has to unwind through the
+    // rollback and cleanup handlers. Exiting here left the Data API transaction open,
+    // holding its lock on kysely_migration_lock until the server-side timeout.
+    throw new Error(`${failureLabel}: ${stderr.trim() || message}`);
   }
 }
 
@@ -444,7 +447,9 @@ function createMigrationCacheContext(apiRepoPath) {
 function buildCachedMigrationPath({ apiRepoPath, filePath, cacheRepoRoot }) {
   const relativeFilePath = path.relative(apiRepoPath, filePath);
   if (!relativeFilePath || relativeFilePath.startsWith("..") || path.isAbsolute(relativeFilePath)) {
-    fail(`Migration file is outside the API repo path: ${filePath}`);
+    // Throws rather than exits: this runs inside the migration transaction, so it has
+    // to unwind through the rollback handler.
+    throw new Error(`Migration file is outside the API repo path: ${filePath}`);
   }
 
   return path.join(
@@ -846,11 +851,15 @@ async function main() {
     const message = error instanceof Error ? error.message : String(error);
     result.ok = false;
     result.error = message;
+    // Set the exit code and return so the finally block still runs; process.exit()
+    // here would skip the temp-directory cleanup below.
+    process.exitCode = 1;
     if (jsonOutput) {
       process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-      process.exit(1);
+      return;
     }
-    fail(message);
+    console.error(message);
+    return;
   } finally {
     setDataApiDbFactory(null);
     fs.rmSync(cacheContext.cacheRoot, { recursive: true, force: true });

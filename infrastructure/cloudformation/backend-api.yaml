@@ -112,6 +112,20 @@ Parameters:
   TimerWebhooksLambdaHandler:
     Type: String
     Default: lambda.timerWebhooks
+  # Schedules are parameters so an operator can tune frequency (and therefore cost)
+  # without editing this template. Defaults match each handler's intended cadence.
+  Timer15MinSchedule:
+    Type: String
+    Default: rate(15 minutes)
+  TimerMidnightSchedule:
+    Type: String
+    Default: cron(0 5 * * ? *)
+  TimerScheduledTasksSchedule:
+    Type: String
+    Default: cron(30 5 * * ? *)
+  TimerWebhooksSchedule:
+    Type: String
+    Default: rate(1 minute)
   TimerLambdaMemorySize:
     Type: Number
     Default: 256
@@ -1495,7 +1509,7 @@ Resources:
     Type: AWS::Events::Rule
     Condition: CreateScheduledWorkers
     Properties:
-      ScheduleExpression: rate(30 minutes)
+      ScheduleExpression: !Ref Timer15MinSchedule
       State: ENABLED
       Targets:
         - Arn: !GetAtt Timer15MinFunction.Arn
@@ -1573,7 +1587,7 @@ Resources:
     Type: AWS::Events::Rule
     Condition: CreateScheduledWorkers
     Properties:
-      ScheduleExpression: cron(0 5 * * ? *)
+      ScheduleExpression: !Ref TimerMidnightSchedule
       State: ENABLED
       Targets:
         - Arn: !GetAtt TimerMidnightFunction.Arn
@@ -1651,7 +1665,7 @@ Resources:
     Type: AWS::Events::Rule
     Condition: CreateScheduledWorkers
     Properties:
-      ScheduleExpression: cron(0 5 * * ? *)
+      ScheduleExpression: !Ref TimerScheduledTasksSchedule
       State: ENABLED
       Targets:
         - Arn: !GetAtt TimerScheduledTasksFunction.Arn
@@ -1719,7 +1733,7 @@ Resources:
     Type: AWS::Events::Rule
     Condition: CreateScheduledWorkers
     Properties:
-      ScheduleExpression: rate(1 minute)
+      ScheduleExpression: !Ref TimerWebhooksSchedule
       State: ENABLED
       Targets:
         - Arn: !GetAtt TimerWebhooksFunction.Arn

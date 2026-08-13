@@ -1,5 +1,10 @@
 name: Deploy AWS From Private Repo
 
+# This workflow lives in your private deployment repository. It checks out three
+# separate sources: this repo (your settings), the installer (the tooling), and the
+# B1Admin frontend source. Free-text inputs are passed through `env:` rather than
+# interpolated into shell text, so a crafted input cannot inject commands.
+
 on:
   workflow_dispatch:
     inputs:
@@ -24,13 +29,23 @@ on:
           - api-repo
           - package-manifest
           - backend-artifact
+      installer_repo:
+        description: "Installer repository to check out"
+        required: true
+        default: dhempler/b1admin-installer
+        type: string
+      installer_ref:
+        description: "Git ref for the installer checkout"
+        required: true
+        default: main
+        type: string
       b1admin_repo:
-        description: "B1Admin source repository to check out"
+        description: "B1Admin frontend source repository to check out"
         required: true
         default: ChurchApps/B1Admin
         type: string
       b1admin_ref:
-        description: "Git ref for the B1Admin source checkout"
+        description: "Git ref for the B1Admin frontend checkout"
         required: true
         default: main
         type: string
@@ -135,6 +150,26 @@ jobs:
       AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME }}
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      # Every free-text input is exposed here and referenced as a shell variable.
+      ENVIRONMENT: ${{ inputs.environment }}
+      AWS_REGION: ${{ inputs.aws_region }}
+      DEPLOYMENT_SOURCE: ${{ inputs.deployment_source }}
+      API_REPO: ${{ inputs.api_repo }}
+      API_REF: ${{ inputs.api_ref }}
+      B1ADMIN_REPO: ${{ inputs.b1admin_repo }}
+      B1ADMIN_REF: ${{ inputs.b1admin_ref }}
+      PACKAGE_MANIFEST_FILE: ${{ inputs.package_manifest_file }}
+      BACKEND_ARTIFACT_SOURCE_FILE: ${{ inputs.backend_artifact_source_file }}
+      MIGRATION_ARTIFACT_SOURCE_FILE: ${{ inputs.migration_artifact_source_file }}
+      DEPENDENCIES_LAYER_SOURCE_FILE: ${{ inputs.dependencies_layer_source_file }}
+      PACKAGE_MODE: ${{ inputs.package_mode }}
+      API_MIGRATION_ACTION: ${{ inputs.api_migration_action }}
+      API_MIGRATION_MODULE: ${{ inputs.api_migration_module }}
+      SYNC_APP_CONFIG_SECRET: ${{ inputs.sync_app_config_secret && 'true' || 'false' }}
+      SYNC_BOOTSTRAP_ADMIN_SECRET: ${{ inputs.sync_bootstrap_admin_secret && 'true' || 'false' }}
+      RUN_API_MIGRATIONS: ${{ inputs.run_api_migrations && 'true' || 'false' }}
+      RUN_BOOTSTRAP_ADMIN: ${{ inputs.run_bootstrap_admin && 'true' || 'false' }}
+      VERIFY_HTTP_AFTER_DEPLOY: ${{ inputs.verify_http_after_deploy && 'true' || 'false' }}
     permissions:
       contents: read
       id-token: write
@@ -143,7 +178,15 @@ jobs:
       - name: Checkout private deploy repo
         uses: actions/checkout@v4
 
-      - name: Checkout B1Admin
+      - name: Checkout installer
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.installer_repo }}
+          ref: ${{ inputs.installer_ref }}
+          path: installer
+          token: ${{ secrets.INSTALLER_REPO_CHECKOUT_TOKEN || github.token }}
+
+      - name: Checkout B1Admin frontend source
         uses: actions/checkout@v4
         with:
           repository: ${{ inputs.b1admin_repo }}
@@ -182,7 +225,11 @@ jobs:
           aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ inputs.aws_region }}
 
-      - name: Install B1Admin dependencies
+      - name: Install installer dependencies
+        working-directory: installer
+        run: npm ci --no-audit --no-fund
+
+      - name: Install B1Admin frontend dependencies
         working-directory: B1Admin
         run: |
           corepack enable
@@ -204,7 +251,7 @@ jobs:
             echo "Missing AWS_APP_CONFIG_SECRET_JSON secret for app config sync." >&2
             exit 1
           fi
-          printf '%s' "${AWS_APP_CONFIG_SECRET_JSON}" > "environments/${{ inputs.environment }}/app-config-secret.json"
+          printf '%s' "${AWS_APP_CONFIG_SECRET_JSON}" > "environments/${ENVIRONMENT}/app-config-secret.json"
 
       - name: Materialize bootstrap admin secret into private repo
         if: ${{ inputs.sync_bootstrap_admin_secret }}
@@ -215,33 +262,34 @@ jobs:
             echo "Missing AWS_BOOTSTRAP_ADMIN_SECRET_JSON secret for bootstrap admin sync." >&2
             exit 1
           fi
-          printf '%s' "${AWS_BOOTSTRAP_ADMIN_SECRET_JSON}" > "environments/${{ inputs.environment }}/bootstrap-admin-secret.json"
+          printf '%s' "${AWS_BOOTSTRAP_ADMIN_SECRET_JSON}" > "environments/${ENVIRONMENT}/bootstrap-admin-secret.json"
 
       - name: Preflight plan
-        working-directory: B1Admin
+        working-directory: installer
         run: |
-          mkdir -p "deployment/${{ inputs.environment }}"
-          npm run plan:environment-deploy -- \
-            --environment="${{ inputs.environment }}" \
-            --environment-dir="../environments/${{ inputs.environment }}" \
-            --region="${{ inputs.aws_region }}" \
-            --deployment-source="${{ inputs.deployment_source }}" \
+          mkdir -p "deployment/${ENVIRONMENT}"
+          prefix_path() { [[ -n "$1" ]] && printf '../%s' "$1" || printf ''; }
+          npm run --silent plan:environment-deploy -- \
+            --environment="${ENVIRONMENT}" \
+            --environment-dir="../environments/${ENVIRONMENT}" \
+            --region="${AWS_REGION}" \
+            --deployment-source="${DEPLOYMENT_SOURCE}" \
             --api-repo-path="../Api" \
-            --api-repo="${{ inputs.api_repo }}" \
-            --api-ref="${{ inputs.api_ref }}" \
-            --package-manifest-file="${{ inputs.package_manifest_file && format('../{0}', inputs.package_manifest_file) || '' }}" \
-            --backend-artifact-source-file="${{ inputs.backend_artifact_source_file && format('../{0}', inputs.backend_artifact_source_file) || '' }}" \
-            --migration-artifact-source-file="${{ inputs.migration_artifact_source_file && format('../{0}', inputs.migration_artifact_source_file) || '' }}" \
-            --dependencies-layer-source-file="${{ inputs.dependencies_layer_source_file && format('../{0}', inputs.dependencies_layer_source_file) || '' }}" \
-            --sync-app-config-secret="${{ inputs.sync_app_config_secret && 'true' || 'false' }}" \
-            --sync-bootstrap-admin-secret="${{ inputs.sync_bootstrap_admin_secret && 'true' || 'false' }}" \
-            --run-api-migrations="${{ inputs.run_api_migrations && 'true' || 'false' }}" \
-            --run-bootstrap-admin="${{ inputs.run_bootstrap_admin && 'true' || 'false' }}" \
-            --api-migration-action="${{ inputs.api_migration_action }}" \
-            --api-migration-module="${{ inputs.api_migration_module }}" \
+            --api-repo="${API_REPO}" \
+            --api-ref="${API_REF}" \
+            --package-manifest-file="$(prefix_path "${PACKAGE_MANIFEST_FILE}")" \
+            --backend-artifact-source-file="$(prefix_path "${BACKEND_ARTIFACT_SOURCE_FILE}")" \
+            --migration-artifact-source-file="$(prefix_path "${MIGRATION_ARTIFACT_SOURCE_FILE}")" \
+            --dependencies-layer-source-file="$(prefix_path "${DEPENDENCIES_LAYER_SOURCE_FILE}")" \
+            --sync-app-config-secret="${SYNC_APP_CONFIG_SECRET}" \
+            --sync-bootstrap-admin-secret="${SYNC_BOOTSTRAP_ADMIN_SECRET}" \
+            --run-api-migrations="${RUN_API_MIGRATIONS}" \
+            --run-bootstrap-admin="${RUN_BOOTSTRAP_ADMIN}" \
+            --api-migration-action="${API_MIGRATION_ACTION}" \
+            --api-migration-module="${API_MIGRATION_MODULE}" \
             --api-migration-runner="data-api" \
-            --verify-http-after-deploy="${{ inputs.verify_http_after_deploy && 'true' || 'false' }}" \
-            --output=markdown | tee "deployment/${{ inputs.environment }}/preflight-plan.md"
+            --verify-http-after-deploy="${VERIFY_HTTP_AFTER_DEPLOY}" \
+            --output=markdown | tee "deployment/${ENVIRONMENT}/preflight-plan.md"
 
       - name: Stop after preview
         if: ${{ inputs.preview_only }}
@@ -249,96 +297,106 @@ jobs:
 
       - name: Deploy bootstrap
         if: ${{ !inputs.preview_only }}
-        working-directory: B1Admin
+        working-directory: installer
         env:
           CLOUDFORMATION_EXECUTION_ROLE_ARN: ${{ secrets.AWS_CLOUDFORMATION_EXECUTION_ROLE_ARN }}
         run: |
-          npm run deploy:bootstrap -- \
-            --region="${{ inputs.aws_region }}" \
-            --stack-name="b1admin-${{ inputs.environment }}-bootstrap" \
-            --parameters-file="../environments/${{ inputs.environment }}/bootstrap-parameters.json"
+          npm run --silent deploy:bootstrap -- \
+            --region="${AWS_REGION}" \
+            --stack-name="b1admin-${ENVIRONMENT}-bootstrap" \
+            --parameters-file="../environments/${ENVIRONMENT}/bootstrap-parameters.json"
 
       - name: Deploy split stack
         if: ${{ !inputs.preview_only }}
-        working-directory: B1Admin
+        working-directory: installer
         env:
           CLOUDFORMATION_EXECUTION_ROLE_ARN: ${{ secrets.AWS_CLOUDFORMATION_EXECUTION_ROLE_ARN }}
+          # The frontend is built from the separately checked-out B1Admin source.
+          B1ADMIN_FRONTEND_SOURCE: ${{ github.workspace }}/B1Admin
         run: |
           ARGS=(
-            --region="${{ inputs.aws_region }}"
+            --region="${AWS_REGION}"
             --project-name=b1admin
-            --environment="${{ inputs.environment }}"
-            --bootstrap-stack-name="b1admin-${{ inputs.environment }}-bootstrap"
-            --backend-parameters-file="../environments/${{ inputs.environment }}/backend-parameters.json"
-            --frontend-parameters-file="../environments/${{ inputs.environment }}/frontend-parameters.json"
-            --verify-http-after-deploy="${{ inputs.verify_http_after_deploy && 'true' || 'false' }}"
-            --package-mode="${{ inputs.package_mode }}"
+            --environment="${ENVIRONMENT}"
+            --bootstrap-stack-name="b1admin-${ENVIRONMENT}-bootstrap"
+            --backend-parameters-file="../environments/${ENVIRONMENT}/backend-parameters.json"
+            --frontend-parameters-file="../environments/${ENVIRONMENT}/frontend-parameters.json"
+            --package-mode="${PACKAGE_MODE}"
+            --frontend-source="${B1ADMIN_FRONTEND_SOURCE}"
           )
 
-          if [[ "${{ inputs.deployment_source }}" == "api-repo" ]]; then
+          if [[ "${DEPLOYMENT_SOURCE}" == "api-repo" ]]; then
             ARGS+=(--api-repo-path="../Api")
-          elif [[ "${{ inputs.deployment_source }}" == "package-manifest" ]]; then
-            ARGS+=(--package-manifest-file="../${{ inputs.package_manifest_file }}")
+          elif [[ "${DEPLOYMENT_SOURCE}" == "package-manifest" ]]; then
+            ARGS+=(--package-manifest-file="../${PACKAGE_MANIFEST_FILE}")
           else
-            ARGS+=(--backend-artifact-source-file="../${{ inputs.backend_artifact_source_file }}")
-            if [[ -n "${{ inputs.migration_artifact_source_file }}" ]]; then
-              ARGS+=(--migration-artifact-source-file="../${{ inputs.migration_artifact_source_file }}")
+            ARGS+=(--backend-artifact-source-file="../${BACKEND_ARTIFACT_SOURCE_FILE}")
+            if [[ -n "${MIGRATION_ARTIFACT_SOURCE_FILE}" ]]; then
+              ARGS+=(--migration-artifact-source-file="../${MIGRATION_ARTIFACT_SOURCE_FILE}")
             fi
-            if [[ -n "${{ inputs.dependencies_layer_source_file }}" ]]; then
-              ARGS+=(--dependencies-layer-source-file="../${{ inputs.dependencies_layer_source_file }}")
+            if [[ -n "${DEPENDENCIES_LAYER_SOURCE_FILE}" ]]; then
+              ARGS+=(--dependencies-layer-source-file="../${DEPENDENCIES_LAYER_SOURCE_FILE}")
             fi
           fi
 
-          if [[ "${{ inputs.sync_app_config_secret }}" == "true" ]]; then
-            ARGS+=(--app-config-secret-file="../environments/${{ inputs.environment }}/app-config-secret.json")
+          if [[ "${SYNC_APP_CONFIG_SECRET}" == "true" ]]; then
+            ARGS+=(--app-config-secret-file="../environments/${ENVIRONMENT}/app-config-secret.json")
           fi
 
-          if [[ "${{ inputs.sync_bootstrap_admin_secret }}" == "true" ]]; then
-            ARGS+=(--bootstrap-admin-secret-file="../environments/${{ inputs.environment }}/bootstrap-admin-secret.json")
+          if [[ "${SYNC_BOOTSTRAP_ADMIN_SECRET}" == "true" ]]; then
+            ARGS+=(--bootstrap-admin-secret-file="../environments/${ENVIRONMENT}/bootstrap-admin-secret.json")
           fi
 
-          if [[ "${{ inputs.run_api_migrations }}" == "true" ]]; then
+          if [[ "${RUN_API_MIGRATIONS}" == "true" ]]; then
             ARGS+=(--run-api-migrations=true)
-            ARGS+=(--api-migration-action="${{ inputs.api_migration_action }}")
-            ARGS+=(--api-migration-module="${{ inputs.api_migration_module }}")
+            ARGS+=(--api-migration-action="${API_MIGRATION_ACTION}")
+            ARGS+=(--api-migration-module="${API_MIGRATION_MODULE}")
             ARGS+=(--api-migration-runner=data-api)
           fi
 
-          if [[ "${{ inputs.run_bootstrap_admin }}" == "true" ]]; then
+          if [[ "${RUN_BOOTSTRAP_ADMIN}" == "true" ]]; then
             ARGS+=(--run-bootstrap-admin=true)
           fi
 
-          npm run deploy:aws -- "${ARGS[@]}"
+          npm run --silent deploy:aws -- "${ARGS[@]}"
 
       - name: Save deployment evidence
         if: ${{ !inputs.preview_only }}
-        working-directory: B1Admin
+        working-directory: installer
         run: |
-          npm run save:split-stack-outputs -- \
-            --environment="${{ inputs.environment }}" \
-            --region="${{ inputs.aws_region }}" \
+          npm run --silent save:split-stack-outputs -- \
+            --environment="${ENVIRONMENT}" \
+            --region="${AWS_REGION}" \
             --output=markdown
+
+      # deploy:aws has no HTTP probe of its own, so the check runs here as its own
+      # step. Passing --verify-http-after-deploy to the deploy was silently ignored
+      # and the job went green without ever probing the site.
+      - name: Verify deployed site over HTTP
+        if: ${{ !inputs.preview_only && inputs.verify_http_after_deploy }}
+        working-directory: installer
+        run: |
+          npm run --silent verify:split-stack -- \
+            --environment="${ENVIRONMENT}" \
+            --region="${AWS_REGION}" \
+            --check-http=true \
+            --output=markdown >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Save source metadata
         if: ${{ !inputs.preview_only }}
-        working-directory: B1Admin
+        working-directory: installer
         env:
-          B1ADMIN_REPO: ${{ inputs.b1admin_repo }}
-          B1ADMIN_REF: ${{ inputs.b1admin_ref }}
-          API_REPO: ${{ inputs.api_repo }}
-          API_REF: ${{ inputs.api_ref }}
-          DEPLOYMENT_SOURCE: ${{ inputs.deployment_source }}
           WORKFLOW_RUN_ID: ${{ github.run_id }}
           PRIVATE_REPO_SHA: ${{ github.sha }}
         run: |
-          mkdir -p "deployment/${{ inputs.environment }}"
+          mkdir -p "deployment/${ENVIRONMENT}"
           node -e '
             const fs = require("fs");
             const child = require("child_process");
             const git = (cwd) => child.execFileSync("git", ["rev-parse", "HEAD"], { cwd, encoding: "utf8" }).trim();
             const metadata = {
               ok: true,
-              environment: "${{ inputs.environment }}",
+              environment: process.env.ENVIRONMENT,
               writtenAt: new Date().toISOString(),
               githubActions: {
                 runId: process.env.WORKFLOW_RUN_ID,
@@ -347,7 +405,7 @@ jobs:
               b1admin: {
                 repo: process.env.B1ADMIN_REPO,
                 ref: process.env.B1ADMIN_REF,
-                sha: git(".")
+                sha: git("../B1Admin")
               },
               api: {
                 repo: process.env.API_REPO,
@@ -355,22 +413,22 @@ jobs:
                 sha: process.env.DEPLOYMENT_SOURCE === "api-repo" ? git("../Api") : ""
               }
             };
-            fs.writeFileSync("deployment/${{ inputs.environment }}/source-metadata.json", `${JSON.stringify(metadata, null, 2)}\n`);
+            fs.writeFileSync(`deployment/${process.env.ENVIRONMENT}/source-metadata.json`, `${JSON.stringify(metadata, null, 2)}\n`);
           '
 
       - name: Write deployment summary
         if: ${{ !inputs.preview_only }}
-        working-directory: B1Admin
+        working-directory: installer
         run: |
-          SUMMARY_FILE="deployment/${{ inputs.environment }}/deployment-summary.json"
+          SUMMARY_FILE="deployment/${ENVIRONMENT}/deployment-summary.json"
           if [[ ! -f "${SUMMARY_FILE}" ]]; then
             echo "Missing deployment summary file: ${SUMMARY_FILE}" >&2
             exit 1
           fi
-          npm run show:deployment-summary -- --summary-file="${SUMMARY_FILE}" --output=markdown >> "${GITHUB_STEP_SUMMARY}"
+          npm run --silent show:deployment-summary -- --summary-file="${SUMMARY_FILE}" --output=markdown >> "${GITHUB_STEP_SUMMARY}"
           {
             echo ""
-            echo "- Artifact: \`aws-${{ inputs.environment }}-deployment-evidence\`"
+            echo "- Artifact: \`aws-${ENVIRONMENT}-deployment-evidence\`"
           } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Upload deployment evidence
@@ -379,5 +437,5 @@ jobs:
         with:
           name: aws-${{ inputs.environment }}-${{ inputs.preview_only && 'preflight-plan' || 'deployment-evidence' }}
           path: |
-            B1Admin/deployment/${{ inputs.environment }}/
+            installer/deployment/${{ inputs.environment }}/
           if-no-files-found: error

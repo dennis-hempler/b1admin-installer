@@ -57,8 +57,17 @@ function fail(message) {
 // small indentation-based scan so the installer needs no YAML dependency; returns null
 // when the shape is not recognized so callers skip the check rather than block a deploy.
 function declaredWorkflowInputs() {
-  const workflowPath = path.join(rootDir, ".github", "workflows", "deploy-aws-self-hosted.yml");
-  if (!fs.existsSync(workflowPath)) return null;
+  // The dispatch targets the workflow in the private deploy repo, which is written
+  // from the sample below — so the sample is what to compare against. The bundled
+  // workflow is the fallback for running against this repo directly.
+  const candidates = [
+    getArg("deploy-repo-dir") ? path.resolve(rootDir, getArg("deploy-repo-dir"), ".github", "workflows", "deploy-aws-self-hosted.yml") : "",
+    path.join(rootDir, "infrastructure", "environments", "private-deployment-workflow.sample.yml"),
+    path.join(rootDir, ".github", "workflows", "deploy-aws-self-hosted.yml"),
+  ].filter(Boolean);
+
+  const workflowPath = candidates.find((candidate) => fs.existsSync(candidate));
+  if (!workflowPath) return null;
 
   const lines = fs.readFileSync(workflowPath, "utf8").split("\n");
   const inputsIndex = lines.findIndex((line) => /^\s{4}inputs:\s*$/.test(line));

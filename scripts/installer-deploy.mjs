@@ -4,7 +4,6 @@ import {
   failText,
   getArg,
   inferDeployRepo,
-  latestWorkflowRunId,
   printJson,
   relativeToRoot,
   requireEnvironmentDir,
@@ -12,6 +11,7 @@ import {
   rootDir,
   runCommandJson,
   runNodeJson,
+  workflowRunIdSince,
 } from "./installer-common.mjs";
 import fs from "node:fs";
 import path from "node:path";
@@ -109,19 +109,29 @@ function main() {
     failText("Installer preflight is blocked. Run `npm run installer:preflight -- --output=markdown` for details.", outputMode, { preflight: preflight.parsed });
   }
 
+  // Sampled before dispatch so the run we pick up afterwards is provably a new one.
+  // Backdated slightly to tolerate clock skew between this machine and GitHub.
+  const dispatchedAtMs = Date.now() - 60_000;
   const dispatch = runNodeJson("scripts/dispatch-github-aws-deploy.mjs", dispatchArgs(environment, environmentDirArg, repo, previewOnly, dryRun));
   if (!dispatch.ok || !dispatch.parsed?.ok) {
     failText(dispatch.stderr.trim() || "GitHub deploy dispatch failed.", outputMode, { dispatch: dispatch.parsed });
   }
 
   let runId = "";
+  let runIdCorrelated = false;
   const followUp = [];
   if (!dryRun) {
     try {
-      runId = latestWorkflowRunId(repo);
+      const resolved = workflowRunIdSince(repo, dispatchedAtMs);
+      runId = resolved.runId;
+      runIdCorrelated = resolved.correlated;
     } catch {
       runId = "";
     }
+  }
+
+  if (runId && !runIdCorrelated) {
+    followUp.push("Could not confirm which run belongs to this dispatch, so the newest run of this workflow was used. Check the run's start time before trusting its result.");
   }
 
   if (watch && runId) {

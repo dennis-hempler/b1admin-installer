@@ -414,11 +414,10 @@ function main() {
     process.exit(1);
   }
 
-  if (skipBuild && !publishFrontendAssets && !skipFrontend && !frontendInfrastructureOnly) {
-    console.error("--skip-build only applies when frontend assets are being published. Use it with a normal frontend deploy, a staged publish follow-up, or publish:frontend-assets directly.");
-    process.exit(1);
-  }
-
+  // A normal frontend deploy with --skip-build is valid: it deploys the hosting stack
+  // and publishes an existing dist/ without rebuilding. Rejecting it here contradicted
+  // this guard's own message and made the --skip-build forwarding below unreachable.
+  // The remaining guard still catches the combinations where nothing gets published.
   if (skipBuild && !publishFrontendAssets && (skipFrontend || frontendInfrastructureOnly)) {
     console.error("--skip-build has no effect when frontend publishing is deferred. Remove it or use it later during the publish phase.");
     process.exit(1);

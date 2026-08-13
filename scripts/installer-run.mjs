@@ -206,12 +206,15 @@ async function main() {
       }
 
       history.push({ step, action: "run", command: nextCommand });
-      // On Windows, yarn/npm are .cmd shims that spawnSync cannot execute
-      // without a shell; quote args so paths with spaces survive the shell.
+      // On Windows, npm is a .cmd shim that spawnSync cannot execute without a shell.
+      // Quoting only args containing whitespace left cmd.exe metacharacters live, so
+      // any arg with a character cmd treats specially is quoted, and embedded quotes
+      // are escaped rather than ending the quoted run.
       const isWindows = process.platform === "win32";
-      const spawnArgs = isWindows
-        ? invocation.args.map((arg) => (/\s/.test(arg) ? `"${arg}"` : arg))
-        : invocation.args;
+      const quoteForCmd = (arg) => (
+        /[\s&|<>^%()"]/.test(arg) ? `"${arg.replace(/"/g, '""')}"` : arg
+      );
+      const spawnArgs = isWindows ? invocation.args.map(quoteForCmd) : invocation.args;
       const result = spawnSync(invocation.command, spawnArgs, {
         cwd: rootDir,
         encoding: "utf8",
