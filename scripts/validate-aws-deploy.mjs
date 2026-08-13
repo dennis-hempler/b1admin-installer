@@ -1344,7 +1344,7 @@ function main() {
     publishArgs.push("--skip-infrastructure");
     publishArgs.push("--publish-frontend-assets");
     if (skipBuild) publishArgs.push("--skip-build");
-    nextSteps.push(`yarn deploy:full-stack -- ${publishArgs.join(" ")}`);
+    nextSteps.push(`npm run deploy:aws -- ${publishArgs.join(" ")}`);
   }
   if (splitStackPublishOnly) {
     const publishArgs = [];

@@ -131,11 +131,15 @@ function main() {
   const skipGhCheck = boolArg("skip-gh-check", false);
   const write = boolArg("write", false);
   const requestedEnvironment = getArg("environment", "all").toLowerCase();
+  // Must honor --deployment-root: the guided runner reads this evidence from the
+  // private deploy repo, so writing it under the installer folder would leave the
+  // readiness check permanently unsatisfied.
+  const deploymentRoot = getArg("deployment-root", "deployment");
   const outputFile = path.resolve(rootDir, getArg(
     "output-file",
     requestedEnvironment === "all" || requestedEnvironment === ""
-      ? path.join("deployment", "github-readiness.json")
-      : path.join("deployment", requestedEnvironment, "github-readiness.json"),
+      ? path.join(deploymentRoot, "github-readiness.json")
+      : path.join(deploymentRoot, requestedEnvironment, "github-readiness.json"),
   ));
   if (!repo) failText("DEPLOY_REPO or --repo is required.", outputMode);
 

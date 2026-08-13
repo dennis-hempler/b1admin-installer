@@ -42,6 +42,16 @@ function parseBoolean(value, fallback = false) {
   return String(value).toLowerCase() === "true";
 }
 
+// getArg returns "" for a bare `--flag` that is last or followed by another flag, so a
+// plain `--dry-run` would fall through to the default and run real migrations. An
+// explicit value still wins, so `--dry-run=false` stays false.
+function boolFlag(name, fallback = false) {
+  const explicit = getArg(name, "");
+  if (explicit !== "") return parseBoolean(explicit, fallback);
+  if (process.argv.includes(`--${name}`)) return true;
+  return fallback;
+}
+
 function fail(message) {
   console.error(message);
   process.exit(1);
@@ -624,7 +634,7 @@ async function main() {
   const dbSecretFile = getArg("db-secret-file");
   const outputMode = getArg("output", "text").toLowerCase();
   const jsonOutput = outputMode === "json";
-  const dryRun = parseBoolean(getArg("dry-run", "false"), false);
+  const dryRun = boolFlag("dry-run", false);
 
   if (!["up", "down", "status"].includes(action)) {
     fail(`Invalid action "${action}". Use up, down, or status.`);

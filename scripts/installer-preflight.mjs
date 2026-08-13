@@ -84,7 +84,11 @@ function main() {
   const outputMode = getArg("output", "text").toLowerCase();
   const includeDetails = boolArg("include-details", false);
   const write = boolArg("write", false);
-  const outputFile = path.resolve(rootDir, getArg("output-file", path.join("deployment", environment, "preflight-readiness.json")));
+  // Must honor --deployment-root: the guided runner reads this evidence from the
+  // private deploy repo, so writing it under the installer folder would leave the
+  // readiness check permanently unsatisfied.
+  const deploymentRoot = getArg("deployment-root", "deployment");
+  const outputFile = path.resolve(rootDir, getArg("output-file", path.join(deploymentRoot, environment, "preflight-readiness.json")));
   const repo = inferDeployRepo(getArg("repo"));
   const environmentDir = resolveEnvironmentDir(environment, environmentDirArg);
 

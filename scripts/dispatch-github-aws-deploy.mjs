@@ -53,6 +53,36 @@ function fail(message) {
   process.exit(1);
 }
 
+// Reads the workflow_dispatch input names out of the bundled workflow file. Kept to a
+// small indentation-based scan so the installer needs no YAML dependency; returns null
+// when the shape is not recognized so callers skip the check rather than block a deploy.
+function declaredWorkflowInputs() {
+  const workflowPath = path.join(rootDir, ".github", "workflows", "deploy-aws-self-hosted.yml");
+  if (!fs.existsSync(workflowPath)) return null;
+
+  const lines = fs.readFileSync(workflowPath, "utf8").split("\n");
+  const inputsIndex = lines.findIndex((line) => /^\s{4}inputs:\s*$/.test(line));
+  if (inputsIndex === -1) return null;
+
+  const names = [];
+  for (let index = inputsIndex + 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (line.trim() === "" || line.trim().startsWith("#")) continue;
+    const indent = line.length - line.trimStart().length;
+    if (indent <= 4) break;
+    const match = indent === 6 ? line.match(/^\s{6}([A-Za-z0-9_-]+):\s*$/) : null;
+    if (match) names.push(match[1]);
+  }
+
+  return names.length > 0 ? names : null;
+}
+
+function undeclaredWorkflowInputs(names) {
+  const declared = declaredWorkflowInputs();
+  if (!declared) return [];
+  return names.filter((name) => !declared.includes(name));
+}
+
 function shellQuote(value) {
   return `'${String(value).replace(/'/g, "'\\''")}'`;
 }
@@ -236,6 +266,19 @@ function main() {
     ...(plan.workflowInputs || {}),
     preview_only: previewOnly ? "true" : "false",
   };
+
+  // GitHub rejects the whole dispatch with an opaque HTTP 422 if any input is not
+  // declared by the target workflow. Compare against the local workflow file first
+  // so the mismatch is reported by name instead.
+  const undeclared = undeclaredWorkflowInputs(Object.keys(workflowInputs));
+  if (undeclared.length > 0) {
+    fail([
+      `The deploy workflow does not accept these inputs: ${undeclared.join(", ")}.`,
+      "The installer and the workflow file are out of sync.",
+      "Update the workflow in your private deploy repo from this installer's copy at",
+      ".github/workflows/deploy-aws-self-hosted.yml, then run this command again.",
+    ].join("\n"));
+  }
 
   const dispatchArgs = ["workflow", "run", "deploy-aws-self-hosted.yml"];
   if (repo) {

@@ -97,6 +97,12 @@ export function getArg(name, fallback = "") {
 }
 
 export function boolArg(name, fallback = false) {
+  // An explicit value always wins (--flag=false, --flag false), but a bare --flag
+  // means true. Without this, `installer:deploy --confirm` was silently ignored and
+  // the run stayed in preview mode with no indication why.
+  const explicit = rawCliArg(name);
+  if (explicit !== "") return explicit.toLowerCase() === "true";
+  if (process.argv.includes(`--${name}`)) return true;
   return getArg(name, fallback ? "true" : "false").toLowerCase() === "true";
 }
 

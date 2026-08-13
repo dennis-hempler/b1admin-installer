@@ -128,8 +128,28 @@ async function shouldRun(rl, command, options) {
   if (options.dryRun) return false;
   if (options.yes && (!gated || options.approveGates)) return true;
 
+  // Without a terminal there is nobody to answer, and awaiting the question would
+  // hang forever on a live pipe or exit silently on closed stdin. Say so instead.
+  if (!process.stdin.isTTY) {
+    const reason = gated
+      ? "This step needs approval before it can change AWS or GitHub state."
+      : "This step needs a yes or no answer.";
+    throw new Error([
+      `${reason} No terminal is attached, so the question cannot be asked.`,
+      "",
+      "Run this command yourself:",
+      `  ${command}`,
+      "",
+      gated
+        ? "Or re-run the installer in a terminal, adding --approve-gates to pre-approve steps like this one."
+        : "Or re-run the installer in a terminal, adding --yes to answer these automatically.",
+    ].join("\n"));
+  }
+
   const suffix = gated ? " [y/N]" : " [Y/n]";
-  const raw = (await rl.question(`Run this command now?${suffix}: `)).trim().toLowerCase();
+  const answer = await rl.question(`Run this command now?${suffix}: `);
+  if (answer === null || answer === undefined) return false;
+  const raw = answer.trim().toLowerCase();
   if (!raw) return !gated;
   return ["y", "yes"].includes(raw);
 }
