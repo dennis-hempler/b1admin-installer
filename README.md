@@ -22,7 +22,7 @@ npm run installer:start    # tells you the next step, every time
 
 ## What You Need
 
-- An AWS account you can create resources in (this will incur AWS charges — see [What Costs Money](./infrastructure/environments/start-here.md#what-costs-money))
+- An AWS account you can create resources in (this will incur AWS charges — see [What Costs Money](./infrastructure/environments/start-here.md#what-costs-money)). Brand new to AWS? [Setting up a brand-new AWS account](./infrastructure/environments/setup/aws-new-account.md) covers it from scratch.
 - A GitHub account
 - Node.js 20 or newer
 - The `aws` and `gh` command-line tools (the doctor command checks these for you)
@@ -52,6 +52,7 @@ Files named `customer-values.json`, `app-config-secret.json`, and `bootstrap-adm
 - [Start Here](./infrastructure/environments/start-here.md) — the main installation walkthrough
 - [Operations After Launch](./infrastructure/environments/operations.md) — updates, backups, secrets, cost control
 - [First Rollout Checklist](./infrastructure/environments/first-rollout-checklist.md)
+- [Setting Up A Brand-New AWS Account](./infrastructure/environments/setup/aws-new-account.md) — from no AWS account to a working `aws` command
 - [Setup Guides](./infrastructure/environments/setup/) — AWS access, IAM roles, GitHub secrets, and CLI setup, one topic per page
 - [Private Deployment Repository](./infrastructure/environments/private-deployment-repo.md)
 

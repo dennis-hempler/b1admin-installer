@@ -6,6 +6,8 @@ AWS CLI is optional only if an advanced operator does every AWS inspection and r
 
 Configure a local AWS profile using your organization's normal sign-in method. Prefer IAM Identity Center or another short-lived credential method over permanent access keys.
 
+If there is no "normal sign-in method" yet — a new AWS account, or nobody has connected the AWS CLI on this computer before — [Setting up a brand-new AWS account](./aws-new-account.md) walks through creating a sign-in and connecting the CLI step by step.
+
 Verify the active identity and region before running any command that changes AWS:
 
 ```bash
@@ -14,7 +16,13 @@ aws configure get region
 npm run installer:doctor -- --output=markdown
 ```
 
-If you use a named profile, add `--profile <profile-name>` to AWS CLI commands or set it through your normal shell configuration.
+If you use a named profile, add `--profile <profile-name>` to AWS CLI commands or set it through your normal shell configuration. The installer scripts do not accept a `--profile` option; they use whatever profile the terminal is already set to, so export it before running them:
+
+```bash
+export AWS_PROFILE=<profile-name>
+```
+
+Naming the profile `default` when you set it up avoids this entirely.
 
 What good output looks like:
 

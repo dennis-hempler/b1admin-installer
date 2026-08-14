@@ -199,8 +199,133 @@ function deleteSecret(secretId, region, forceDelete) {
   runAws(args, { stdio: "inherit" });
 }
 
+function getStackParameters(stackName, region) {
+  try {
+    const output = runAwsJson([
+      "cloudformation", "describe-stacks",
+      "--stack-name", stackName,
+      "--region", region,
+      "--output", "json",
+    ]);
+
+    const stack = Array.isArray(output.Stacks) ? output.Stacks[0] : null;
+    const parameters = Array.isArray(stack?.Parameters) ? stack.Parameters : [];
+    const values = {};
+    for (const parameter of parameters) {
+      if (parameter?.ParameterKey) values[parameter.ParameterKey] = parameter.ParameterValue || "";
+    }
+    return values;
+  } catch {
+    return {};
+  }
+}
+
+// The backend template sets DeletionPolicy: Snapshot on DatabaseCluster, so every teardown
+// strands one manual cluster snapshot that CloudFormation will never reclaim. Only the cluster
+// carries that policy; the writer instance does not produce its own snapshot.
+function listFinalClusterSnapshots(snapshotPrefix, region) {
+  const output = runAwsJson([
+    "rds", "describe-db-cluster-snapshots",
+    "--snapshot-type", "manual",
+    "--region", region,
+    "--output", "json",
+  ]);
+
+  const snapshots = Array.isArray(output.DBClusterSnapshots) ? output.DBClusterSnapshots : [];
+  return uniq(snapshots
+    .map((snapshot) => snapshot.DBClusterSnapshotIdentifier)
+    .filter((identifier) => identifier && identifier.startsWith(snapshotPrefix)));
+}
+
+function deleteClusterSnapshot(snapshotId, region) {
+  try {
+    runAws([
+      "rds", "delete-db-cluster-snapshot",
+      "--db-cluster-snapshot-identifier", snapshotId,
+      "--region", region,
+    ]);
+  } catch (error) {
+    if (String(error.message || "").includes("DBClusterSnapshotNotFoundFault")) return;
+    throw error;
+  }
+}
+
+function parseCertificateRegion(certificateArn) {
+  const match = String(certificateArn).match(/^arn:aws:acm:([^:]+):\d{12}:certificate\/.+$/);
+  return match ? match[1] : "";
+}
+
+function describeCertificate(certificateArn, region) {
+  try {
+    const output = runAwsJson([
+      "acm", "describe-certificate",
+      "--certificate-arn", certificateArn,
+      "--region", region,
+      "--output", "json",
+    ]);
+    return output.Certificate || null;
+  } catch {
+    return null;
+  }
+}
+
+// A `_hash.<sub>.<domain>` name does not say which certificate owns it, and one certificate can
+// own several (a SAN adds a record per name), so validation records are always resolved from the
+// certificate itself rather than matched by name.
+function certificateValidationRecords(certificate) {
+  const options = Array.isArray(certificate?.DomainValidationOptions) ? certificate.DomainValidationOptions : [];
+  return options
+    .map((option) => option.ResourceRecord)
+    .filter((record) => record?.Name && record?.Type);
+}
+
+function findRecordSet(hostedZoneId, recordName, recordType) {
+  try {
+    const output = runAwsJson([
+      "route53", "list-resource-record-sets",
+      "--hosted-zone-id", hostedZoneId,
+      "--start-record-name", recordName,
+      "--start-record-type", recordType,
+      "--max-items", "1",
+      "--output", "json",
+    ]);
+
+    const sets = Array.isArray(output.ResourceRecordSets) ? output.ResourceRecordSets : [];
+    const match = sets[0];
+    // --start-record-name returns the first record at OR AFTER the requested name, so a record
+    // that does not exist comes back as an unrelated neighbour (verified 2026-08-14: asking for a
+    // missing "_hash.gone.<domain>" CNAME returned the live "n8n.<domain>" A record). Deleting
+    // that blind would take out a live record, so the exact name+type match below is required.
+    if (!match || match.Name !== recordName || match.Type !== recordType) return null;
+    return match;
+  } catch {
+    return null;
+  }
+}
+
+function deleteRecordSet(hostedZoneId, recordSet) {
+  const changeBatch = JSON.stringify({
+    Comment: "Remove ACM validation record for a certificate deleted during reset",
+    Changes: [{ Action: "DELETE", ResourceRecordSet: recordSet }],
+  });
+
+  runAws([
+    "route53", "change-resource-record-sets",
+    "--hosted-zone-id", hostedZoneId,
+    "--change-batch", changeBatch,
+  ]);
+}
+
 function buildResetPlan(options) {
-  const { region, stackPrefix, appConfigSecretName, forceDeleteSecret, removeLocalEvidence } = options;
+  const {
+    region,
+    stackPrefix,
+    appConfigSecretName,
+    forceDeleteSecret,
+    removeLocalEvidence,
+    deleteFinalSnapshots,
+    deleteCertificates,
+  } = options;
   const frontendStack = `${stackPrefix}-frontend`;
   const backendStack = `${stackPrefix}-backend`;
   const bootstrapStack = `${stackPrefix}-bootstrap`;
@@ -233,12 +358,38 @@ function buildResetPlan(options) {
     ...findBucketsByPrefix([`${stackPrefix.toLowerCase()}-templates-`]),
   ]);
 
+  // CloudFormation names final snapshots "<stack>-snapshot-<logicalid>-<random>".
+  const finalSnapshotPrefix = `${backendStack}-snapshot-`;
+  const existingFinalSnapshots = listFinalClusterSnapshots(finalSnapshotPrefix, region);
+
+  // Certificates are customer-supplied stack parameters, not resources this installer creates,
+  // so they are read from the live stacks. Once the stacks are gone there is nothing left to
+  // read them from, which is why a rerun against an already-deleted environment cannot find them.
+  const frontendParameters = frontendExists ? getStackParameters(frontendStack, region) : {};
+  const backendParameters = backendExists ? getStackParameters(backendStack, region) : {};
+  const certificateArns = uniq([
+    frontendParameters.AcmCertificateArn,
+    backendParameters.ApiCertificateArn,
+  ]);
+  const hostedZoneIds = uniq([
+    frontendParameters.HostedZoneId,
+    backendParameters.ApiHostedZoneId,
+  ]);
+
   const actions = [];
 
   frontendBuckets.forEach((bucket) => actions.push(`Empty frontend site bucket ${bucket}`));
   if (frontendExists) actions.push(`Delete stack ${frontendStack}`);
   backendBuckets.forEach((bucket) => actions.push(`Empty backend managed asset bucket ${bucket}`));
   if (backendExists) actions.push(`Delete stack ${backendStack}`);
+  if (deleteFinalSnapshots) {
+    const pending = backendExists ? existingFinalSnapshots.length + 1 : existingFinalSnapshots.length;
+    if (pending > 0) {
+      actions.push(`Delete ${pending} Aurora final snapshot(s) matching ${finalSnapshotPrefix}*${backendExists ? " (including the one this teardown creates)" : ""} — THIS DESTROYS THE DATABASE CONTENTS PERMANENTLY`);
+    }
+  } else if (existingFinalSnapshots.length > 0 || backendExists) {
+    actions.push(`Keep Aurora final snapshot(s) matching ${finalSnapshotPrefix}* (${existingFinalSnapshots.length} already present); they bill monthly until deleted`);
+  }
   lambdaLogGroups.forEach((logGroupName) => actions.push(`Delete Lambda log group ${logGroupName}`));
   if (databaseMasterSecret) {
     actions.push(`Delete database master secret ${databaseMasterSecret}${forceDeleteSecret ? " immediately" : " with recovery window"}`);
@@ -249,6 +400,11 @@ function buildResetPlan(options) {
   bootstrapArtifactBuckets.forEach((bucket) => actions.push(`Empty bootstrap artifact bucket ${bucket}`));
   bootstrapTemplateBuckets.forEach((bucket) => actions.push(`Empty bootstrap template bucket ${bucket}`));
   if (bootstrapExists) actions.push(`Delete stack ${bootstrapStack}`);
+  certificateArns.forEach((certificateArn) => {
+    actions.push(deleteCertificates
+      ? `Delete ACM certificate ${certificateArn} and its DNS validation records, if nothing else is using it`
+      : `Report ACM certificate ${certificateArn} as unused (pass --delete-certificates=true to remove it)`);
+  });
   if (removeLocalEvidence && fs.existsSync(deploymentDir)) {
     actions.push(`Remove local deployment evidence in ${path.relative(rootDir, deploymentDir)}`);
   }
@@ -266,9 +422,75 @@ function buildResetPlan(options) {
     databaseMasterSecret,
     bootstrapArtifactBuckets,
     bootstrapTemplateBuckets,
+    finalSnapshotPrefix,
+    existingFinalSnapshots,
+    certificateArns,
+    hostedZoneIds,
     deploymentDir,
     actions,
   };
+}
+
+function cleanUpFinalSnapshots(plan, region) {
+  const snapshotIds = listFinalClusterSnapshots(plan.finalSnapshotPrefix, region);
+  for (const snapshotId of snapshotIds) {
+    deleteClusterSnapshot(snapshotId, region);
+    console.log(`Deleted Aurora final snapshot ${snapshotId}.`);
+  }
+  return snapshotIds.length;
+}
+
+function cleanUpCertificates(plan, region, deleteCertificates) {
+  const notes = [];
+
+  for (const certificateArn of plan.certificateArns) {
+    const certificateRegion = parseCertificateRegion(certificateArn);
+    if (!certificateRegion) {
+      notes.push(`Could not parse a region from certificate ARN ${certificateArn}; left in place.`);
+      continue;
+    }
+
+    const certificate = describeCertificate(certificateArn, certificateRegion);
+    if (!certificate) continue;
+
+    const inUseBy = Array.isArray(certificate.InUseBy) ? certificate.InUseBy : [];
+    if (inUseBy.length > 0) {
+      notes.push(`ACM certificate ${certificateArn} is still attached to ${inUseBy.join(", ")}; left in place. AWS can take a while to release a certificate after a CloudFront distribution is deleted, so retry later if you expected it to be free.`);
+      continue;
+    }
+
+    if (!deleteCertificates) {
+      notes.push(`ACM certificate ${certificateArn} is now unused. It costs nothing to keep and is reusable on the next install; rerun with --delete-certificates=true to remove it.`);
+      continue;
+    }
+
+    const validationRecords = certificateValidationRecords(certificate);
+
+    try {
+      runAws(["acm", "delete-certificate", "--certificate-arn", certificateArn, "--region", certificateRegion]);
+    } catch (error) {
+      notes.push(`Could not delete ACM certificate ${certificateArn}: ${String(error.message || "").split("\n")[0]}`);
+      continue;
+    }
+    console.log(`Deleted ACM certificate ${certificateArn}.`);
+
+    for (const record of validationRecords) {
+      let removed = false;
+      for (const hostedZoneId of plan.hostedZoneIds) {
+        const recordSet = findRecordSet(hostedZoneId, record.Name, record.Type);
+        if (!recordSet) continue;
+        deleteRecordSet(hostedZoneId, recordSet);
+        console.log(`Deleted DNS validation record ${record.Name} from hosted zone ${hostedZoneId}.`);
+        removed = true;
+        break;
+      }
+      if (!removed) {
+        notes.push(`Validation record ${record.Name} was not found in any hosted zone this stack referenced; remove it by hand if it still exists.`);
+      }
+    }
+  }
+
+  return notes;
 }
 
 function main() {
@@ -279,6 +501,12 @@ function main() {
   const appConfigSecretName = `${projectName}/${environment}/app-config`;
   const forceDeleteSecret = getBooleanArg("force-delete-secret", true);
   const removeLocalEvidence = getBooleanArg("remove-local-evidence", true);
+  // On by default: this script already force-deletes the database master secret, so a surviving
+  // snapshot has no credentials to restore with. Set to false to keep the snapshot as a safety net.
+  const deleteFinalSnapshots = getBooleanArg("delete-final-snapshots", true);
+  // Off by default: certificates are supplied by the customer as stack parameters, may be shared
+  // with resources this installer does not manage, and are free to keep.
+  const deleteCertificates = getBooleanArg("delete-certificates", false);
   const dryRun = getBooleanArg("dry-run", false);
 
   const plan = buildResetPlan({
@@ -288,6 +516,8 @@ function main() {
     appConfigSecretName,
     forceDeleteSecret,
     removeLocalEvidence,
+    deleteFinalSnapshots,
+    deleteCertificates,
   });
 
   if (dryRun) {
@@ -311,6 +541,10 @@ function main() {
   for (const bucket of plan.backendBuckets) {
     if (bucketExists(bucket, region)) deleteBucket(bucket, region);
   }
+  // Runs after the backend stack is gone: the final snapshot does not exist until CloudFormation
+  // takes it on the way out, so it cannot be enumerated at plan time.
+  if (deleteFinalSnapshots) cleanUpFinalSnapshots(plan, region);
+
   for (const logGroupName of plan.lambdaLogGroups) deleteLogGroup(logGroupName, region);
 
   if (plan.databaseMasterSecret && secretExists(plan.databaseMasterSecret, region)) {
@@ -331,11 +565,33 @@ function main() {
     if (bucketExists(bucket, region)) deleteBucket(bucket, region);
   }
 
+  // Runs last: a certificate stays attached until the CloudFront distribution and the API
+  // custom domain that reference it are fully deleted.
+  const certificateNotes = cleanUpCertificates(plan, region, deleteCertificates);
+
   if (removeLocalEvidence && fs.existsSync(plan.deploymentDir)) {
     fs.rmSync(plan.deploymentDir, { recursive: true, force: true });
   }
 
   console.log(`Reset complete for ${environment} in ${region}.`);
+
+  if (!deleteFinalSnapshots) {
+    const remaining = listFinalClusterSnapshots(plan.finalSnapshotPrefix, region);
+    if (remaining.length > 0) {
+      console.log(`\nAurora snapshots kept (these bill monthly until deleted):`);
+      for (const snapshotId of remaining) {
+        console.log(`  ${snapshotId}`);
+      }
+      console.log(`  Delete one with: aws rds delete-db-cluster-snapshot --region ${region} --db-cluster-snapshot-identifier <id>`);
+    }
+  }
+
+  if (certificateNotes.length > 0) {
+    console.log(`\nCertificate notes:`);
+    for (const note of certificateNotes) {
+      console.log(`  ${note}`);
+    }
+  }
 }
 
 main();

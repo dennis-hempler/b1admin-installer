@@ -103,6 +103,8 @@ If you are not sure whether something is ready, use the quick checks in this sec
 
 You need an AWS account where B1Admin is allowed to create resources.
 
+**Starting from a brand-new AWS account, or never run AWS commands in a terminal before?** Work through [Setting up a brand-new AWS account](./setup/aws-new-account.md) first. It covers creating the account, protecting the root user, setting a billing alert, creating a sign-in you can use from the terminal, and connecting the AWS CLI. The rest of this section assumes those are done.
+
 Have:
 
 - AWS account ID
@@ -121,10 +123,11 @@ aws configure get region
 
 The account in `aws sts get-caller-identity` should match the AWS account where B1Admin will run. The region should match the region you plan to use, normally `us-east-1`.
 
-If these commands fail, ask the AWS administrator how to sign in from the AWS CLI. If the account number is wrong, stop and switch AWS accounts before continuing.
+If these commands fail, ask the AWS administrator how to sign in from the AWS CLI. If nobody else administers the account, [Setting up a brand-new AWS account](./setup/aws-new-account.md) walks through getting these two commands working. If the account number is wrong, stop and switch AWS accounts before continuing.
 
 Read:
 
+- [Setting up a brand-new AWS account](./setup/aws-new-account.md) — start here if the account is new
 - [AWS account access](./setup/aws-account-access.md)
 - [AWS IAM deployment roles](./setup/aws-iam-roles.md)
 - [AWS CLI](./setup/aws-cli.md)
@@ -587,7 +590,7 @@ AWS charges depend on your account, region, usage, and current AWS pricing. In g
 - Optional staging creates a second AWS stack and can cost extra while it is running.
 - Aurora/RDS database resources are usually one of the most important cost items.
 - CloudFront, S3, Lambda, API Gateway, Secrets Manager, Route53, NAT/networking, and logs may also create charges.
-- Retained Aurora final snapshots may continue to cost money after a reset until they are removed.
+- A reset deletes the Aurora final snapshot it creates, so snapshots no longer pile up after repeated resets. If you override that with `--delete-final-snapshots=false`, the retained snapshots keep costing money until you remove them.
 - ACM public certificates are usually free, but Route53 hosted zones and DNS queries can cost money.
 
 To keep the AWS footprint smaller, deploy `prod` only, skip staging, and delete temporary testing resources when you are finished testing.
@@ -653,7 +656,7 @@ Before considering the install complete, confirm:
 - [ ] Safe private repository changes have been committed and pushed.
 - [ ] `customer-values.json`, app secret files, bootstrap secret files, and `deployment/` were not committed.
 - [ ] If staging was only used for practice, staging has been reset or intentionally left running.
-- [ ] Any retained database snapshots are either intentionally kept or cleaned up.
+- [ ] Any database snapshots kept with `--delete-final-snapshots=false` are either intentionally kept or cleaned up.
 
 ## Update An Existing Install
 
@@ -738,7 +741,14 @@ npm run reset:staging -- --region=us-east-1 --dry-run=true
 npm run reset:staging -- --region=us-east-1
 ```
 
-The reset scripts remove CloudFormation stacks, retained buckets, Lambda log groups, and generated Secrets Manager secrets. Aurora final snapshots may remain by design.
+The reset scripts remove CloudFormation stacks, retained buckets, Lambda log groups, generated Secrets Manager secrets, and the Aurora final snapshot — **which means the database contents are gone for good.** Run the `--dry-run=true` line above first and read what it plans to delete.
+
+Two flags change what a reset touches:
+
+- `--delete-final-snapshots=false` keeps the Aurora snapshot instead of deleting it. The reset then prints what it left behind. Use this if there is any chance you want the data back.
+- `--delete-certificates=true` also deletes the TLS certificates the stacks used, plus their DNS validation records. Off by default, because you supplied those certificates yourself and they are free to keep and reuse on the next install. A certificate still attached to something is always skipped and reported rather than force-deleted.
+
+Run a reset while the stacks still exist — the certificate ARNs are read from the live stacks, and once the stacks are gone there is nothing left to read them from. Reset uses your own AWS credentials, not the GitHub deploy role, so it needs an account that can delete these resources.
 
 ## If Something Fails
 

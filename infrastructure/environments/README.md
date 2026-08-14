@@ -8,7 +8,7 @@ This folder is reference material for the installer. New installers should not s
 
 - [`start-here.md`](./start-here.md): the main step-by-step guide for a new installer.
 - [`operations.md`](./operations.md): what to do after launch - updates, version pinning, backups, secrets, and cost control.
-- [`setup/`](./setup): short prerequisite explanations linked from the main guide.
+- [`setup/`](./setup): short prerequisite explanations linked from the main guide. Start with [`setup/aws-new-account.md`](./setup/aws-new-account.md) when the AWS account is brand new.
 - [`prod/`](./prod): checked-in production starter files copied into the user's private repository.
 - [`staging/`](./staging): optional practice-environment starter files copied into the user's private repository.
 - [`private-deployment-repo.md`](./private-deployment-repo.md): reference guide for the user's private repository.

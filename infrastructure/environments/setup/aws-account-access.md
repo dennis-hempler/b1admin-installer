@@ -1,5 +1,7 @@
 # AWS Account Access
 
+This page assumes you can already run `aws sts get-caller-identity` and see the right account number. If you cannot — the AWS account is new, or the AWS CLI has never been connected on this computer — do [Setting up a brand-new AWS account](./aws-new-account.md) first.
+
 You need access to the AWS account where B1Admin will run. Staging is optional. If you use staging, keep staging and prod separated by their environment names and IAM roles.
 
 For the recommended GitHub Actions deployment, an AWS administrator must create these for each environment you plan to deploy. If nobody else manages your AWS account, the AWS administrator is you: sign in with your normal AWS CLI login (it needs permission to create IAM roles, which the account owner has) and run the printed commands yourself.

@@ -38,7 +38,7 @@ Each environment folder under [`environments/`](./environments) ships starter pa
 
 ## Cost and teardown
 
-See [What Costs Money?](./environments/start-here.md#what-costs-money) for the monthly estimate (roughly $80-90 for prod with defaults) and [Operations After Launch](./environments/operations.md) for updates, backups, secret rotation, and billing alarms. `npm run reset:prod -- --dry-run=true` previews teardown; Aurora final snapshots are retained by design.
+See [What Costs Money?](./environments/start-here.md#what-costs-money) for the monthly estimate (roughly $80-90 for prod with defaults) and [Operations After Launch](./environments/operations.md) for updates, backups, secret rotation, and billing alarms. `npm run reset:prod -- --dry-run=true` previews teardown; the reset deletes the Aurora final snapshot it creates (pass `--delete-final-snapshots=false` to keep it) and leaves your ACM certificates alone unless you pass `--delete-certificates=true`.
 
 ## Conventions
 

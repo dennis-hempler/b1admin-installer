@@ -33,7 +33,16 @@ The Aurora database is the only place your data lives. Everything else (Lambda f
 
 - Aurora takes automated daily backups. You can also take a manual snapshot any time from the AWS console: RDS > Databases > select the `b1admin-prod-cluster` > Actions > Take snapshot. Take one before every production update.
 - To restore: RDS > Snapshots > select the snapshot > Actions > Restore snapshot. This creates a NEW cluster; restoring into the running stack is an advanced operation — if you are not comfortable with it, restore the snapshot, verify the data, and ask for help re-pointing the stack before deleting anything.
-- Never delete the running cluster to "clean up." Use `npm run reset:prod -- --dry-run=true` first for any teardown, and read what it plans to do.
+- Never delete the running cluster to "clean up." Use `npm run reset:prod -- --dry-run=true` first for any teardown, and read what it plans to do. The dry run spells out every snapshot it will delete — a reset is not recoverable once it has run.
+
+### What a reset leaves behind
+
+A reset removes the stacks, their buckets, the secrets, the Lambda log groups, and the Aurora final snapshots. Two things it does **not** touch by default:
+
+- **Your TLS certificate.** The installer never creates certificates — you supply them as `AcmCertificateArn` / `ApiCertificateArn` — so a reset leaves them alone, reports them as unused, and you can reuse them on the next install at no cost. Add `--delete-certificates=true` to remove them along with their DNS validation records. A certificate that is still attached to something is always skipped and reported, never force-deleted; AWS can take a while to release one after a CloudFront distribution is deleted, so retry later if you expected it to be free.
+- **Your hosted zone and its records**, apart from the validation records belonging to a certificate you explicitly asked to delete.
+
+Certificates are read from the live stacks, so run the reset while the stacks still exist. If the stacks are already gone, there is nothing left to read the certificate ARNs from and you will need to find them in the AWS console.
 
 ## Secrets
 
@@ -46,7 +55,7 @@ The application secrets (JWT signing key, encryption key, third-party API keys) 
 ## Cost Control
 
 - Create a billing alert once: AWS console > Billing and Cost Management > Budgets > Create budget. A monthly cost budget with an email alert at your expected amount (see [What Costs Money?](./start-here.md#what-costs-money)) catches surprises.
-- After any `reset:staging` / `reset:prod`, Aurora leaves a final snapshot by design. Snapshots cost money monthly. When you are sure you do not need one: RDS > Snapshots > select it > Actions > Delete snapshot.
+- Aurora takes a final snapshot whenever the database is torn down, and snapshots cost money monthly. `reset:staging` / `reset:prod` now delete those snapshots as part of the reset, so they no longer pile up. **This means a reset destroys the data permanently.** To keep the snapshot instead, add `--delete-final-snapshots=false`; the reset then prints the snapshot names it left behind and what they will cost you. To remove one later by hand: RDS > Snapshots > select it > Actions > Delete snapshot.
 - The NAT gateway (about $33/month) is required for outbound connections the backend makes to anything outside the VPC: payment gateways (Stripe/PayPal), Mautic, YouTube lookups, outgoing email through SES's API, and real-time WebSocket pushes (chat/notifications). Only set `CreateNatGateway` to `"false"` if you use none of those; the core features (database, secrets, file storage, text-to-speech) keep working through private endpoints, which have their own smaller cost (roughly $8/month per endpoint).
 
 ## Security Posture Notes
