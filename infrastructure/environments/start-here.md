@@ -2,14 +2,14 @@
 
 Use this guide to deploy B1Admin into your AWS account.
 
-This document is for the person doing the installation. You do not need to write code, and you should not push anything back to the source repository.
+This document is for the person doing the installation. You do not need to write code, and you should not push anything back to the B1Admin or Api source repositories.
 
 You will work with two repositories:
 
 - installer repository: this repository, which contains the installer tools, infrastructure templates, and deployment workflow.
-- user's private repository: the private repository that stores your AWS settings, GitHub workflow, environment files, and deployment evidence.
+- your private repository: the private repository that stores your AWS settings, GitHub workflow, environment files, and deployment evidence.
 
-Do not push customer settings, generated secrets, or deployment evidence back to the source repository or the Api source repository.
+Do not push customer settings, generated secrets, or deployment evidence back to the B1Admin source repository or the Api source repository.
 
 ## Table Of Contents
 
@@ -19,7 +19,7 @@ Read these sections in order the first time through:
 2. [Using An AI Helper](#using-an-ai-helper) - optional instructions for using an AI agent safely.
 3. [Conventions Used In This Guide](#conventions-used-in-this-guide) - explains placeholders, regions, environments, and folder names used in commands.
 4. [What You Need Before You Start](#what-you-need-before-you-start) - confirms AWS, GitHub, and local computer access before any commands run.
-5. [Where The Folders Go](#where-the-folders-go) - explains where the source repository and user's private repository live on your computer.
+5. [Where The Folders Go](#where-the-folders-go) - explains where the installer and your private repository live on your computer.
 6. [Before You Run Commands Checklist](#before-you-run-commands-checklist) - quick checklist before starting.
 7. [The Short Version](#the-short-version) - the main step-by-step path most users should follow.
 8. [Who Does What](#who-does-what) - shows when the deployment operator, AWS administrator, and GitHub administrator are involved.
@@ -60,7 +60,7 @@ Please use infrastructure/environments/start-here.md as the main guide.
 
 Important rules:
 - Run installer commands from the installer repository folder.
-- The user's private repository is beside B1Admin, usually ../b1admin-deploy.
+- Your private repository is beside the installer repository, usually ../b1admin-deploy.
 - Do not push customer settings, generated secrets, or deployment evidence back to the B1Admin source repository or the Api source repository.
 - Do not commit customer-values.json, app-config-secret.json, bootstrap-admin-secret.json, or deployment/.
 - Use prod for the normal install. Use staging only if I choose an optional practice deployment.
@@ -80,14 +80,15 @@ The commands in this guide use examples. Replace them when your install uses dif
 | `us-east-1` | AWS region where B1Admin is deployed | Change this to your chosen AWS region. CloudFront frontend certificates still must be in `us-east-1`. |
 | `prod` | Production environment | Use `prod` for the normal install with the smallest AWS footprint. Use `staging` only for the optional practice deployment. |
 | `staging` | Optional practice environment | Skip staging if you do not want the extra AWS stack and cost. |
-| `../b1admin-deploy` | User's private repository folder beside `B1Admin` | Change this if your private repository folder has a different name or path. |
-| `<owner>/<private-deploy-repo>` | GitHub repo name, such as `your-org/b1admin-deploy` | Replace with the user's private repository name. |
+| `../b1admin-deploy` | Your private repository folder, beside `b1admin-installer` | Change this if your private repository folder has a different name or path. |
+| `b1admin-installer` | This installer repository — the folder you run every command from | Change this only if you cloned it under a different folder name. |
+| `<owner>/<private-deploy-repo>` | GitHub repo name, such as `your-org/b1admin-deploy` | Replace with your private repository name. |
 | `<aws-account-id>` | Your 12-digit AWS account ID | Replace with the AWS account where B1Admin will run. |
 | `<staging|prod>` | Choose one environment value | Type either `staging` or `prod`; do not include the angle brackets. |
 
 Type or paste the commands into your terminal. Do not type the triple backticks around command examples.
 
-The word `ref` means the source repository branch, tag, or commit to deploy. Most installs use `main`.
+The word `ref` means the B1Admin or Api source branch, tag, or commit to deploy. Most installs use `main`.
 
 If a command includes `--environment=prod`, it is for production. If you chose the optional staging path, use `--environment=staging` for the staging run, then repeat the prod command after staging is clean.
 
@@ -134,7 +135,7 @@ Read:
 
 ### GitHub
 
-You need a GitHub account that can access the B1Admin and Api source repositories and manage the user's private repository.
+You need a GitHub account that can access the B1Admin and Api source repositories and manage your private repository.
 
 Have:
 
@@ -152,7 +153,7 @@ gh auth status
 gh repo view <owner>/<private-deploy-repo>
 ```
 
-You should see the GitHub account that has access to the user's private repository. If the repo check fails, make sure the private repository exists, your GitHub account has access, and you replaced `<owner>/<private-deploy-repo>` with the real repo name.
+You should see the GitHub account that has access to your private repository. If the repo check fails, make sure the private repository exists, your GitHub account has access, and you replaced `<owner>/<private-deploy-repo>` with the real repo name.
 
 Also confirm you can open or view the source repositories:
 
@@ -163,13 +164,13 @@ gh repo view ChurchApps/Api
 
 If your organization uses a fork or private mirror, replace those names with the source repository names you will deploy.
 
-You normally do not need to create your own private Api repository. The user's private repository stores deployment settings and the workflow. The workflow checks out the Api source repository during deployment using read-only access.
+You normally do not need to create your own private Api repository. Your private repository stores deployment settings and the workflow. The workflow checks out the Api source repository during deployment using read-only access.
 
 Read:
 
 - [GitHub CLI](./setup/github-cli.md)
 - [Backend Api repository access](./setup/api-repository-access.md)
-- [User's private repository](./setup/deployment-repository.md)
+- [Your private repository](./setup/deployment-repository.md)
 - [GitHub Environments](./setup/github-environments.md)
 - [GitHub deployment secrets](./setup/github-deployment-secrets.md)
 
@@ -221,82 +222,72 @@ Read:
 
 ## Where The Folders Go
 
-Pick one normal folder on your computer to hold both repositories. This can be anywhere you normally keep work files. The guide calls this your parent folder.
+You need **two folders on your computer**, side by side:
 
-Examples:
+```text
+parent-folder/
+  b1admin-installer/   <- this installer. Run every command in this guide here.
+  b1admin-deploy/      <- your private repository. The installer writes your settings here.
+```
 
-- macOS: `/Users/your-name/Documents/B1Admin-Install/`
+**You do not need a copy of the B1Admin application source.** The installer does not contain it and does not build it on your computer — the deployment checks it out on GitHub when it runs. The same is true of the `Api` backend source.
+
+`parent-folder` is not a literal name you have to create. It just means "the folder that holds both", and it can be anywhere you keep work files:
+
 - macOS: `/Users/your-name/Documents/Repos/`
+- macOS: `/Users/your-name/Documents/B1Admin-Install/`
 - Windows: `C:\Work\B1Admin-Install\`
 
-Inside that parent folder, keep the source repository and the user's private repository side by side.
-
-Example:
-
-```text
-parent-folder/
-  B1Admin/
-  b1admin-deploy/
-```
-
-The Api source repository does not need to be in this folder for the normal guided install. If an advanced operator does local backend packaging later, they may also clone Api beside B1Admin:
-
-```text
-parent-folder/
-  B1Admin/
-  b1admin-deploy/
-  Api/              <- optional; not needed for the normal guided path
-```
-
-In that example, `parent-folder` is not a literal folder name you must create. It just means "the folder that contains both repositories."
-For example, if you choose `/Users/your-name/Documents/B1Admin-Install/`, then your folders would be:
+So if you chose `/Users/your-name/Documents/B1Admin-Install/`, your folders are:
 
 ```text
 /Users/your-name/Documents/B1Admin-Install/
-  B1Admin/
+  b1admin-installer/
   b1admin-deploy/
 ```
 
-Open a terminal in the `B1Admin` source repository folder before running the commands in this guide.
+### Which folder to run commands in
 
-That means your terminal is here:
+**Always `b1admin-installer`.** Every `npm run installer:...` command in this guide is run from there, never from `b1admin-deploy`.
 
-```text
-parent-folder/
-  B1Admin/          <- run yarn commands here
-  b1admin-deploy/   <- user's private repository
-```
-
-Do not run the installer commands from inside `b1admin-deploy`.
-Run them from inside `B1Admin`.
-
-The commands use `../b1admin-deploy` because `b1admin-deploy` is beside `B1Admin`, not inside it.
-
-From inside `B1Admin`:
+That is why the commands say `../b1admin-deploy`: from inside `b1admin-installer`,
 
 - `..` means "go up one folder to the parent folder"
 - `../b1admin-deploy` means "go up to the parent folder, then into `b1admin-deploy/`"
 - `../b1admin-deploy/customer-values.json` is the customer worksheet the installer creates
 - `../b1admin-deploy/deployment/` is where local deployment evidence is saved
 
-If the user's private repository has a different folder name, replace every `../b1admin-deploy` in the commands with your folder path.
+If your private repository folder has a different name, replace every `../b1admin-deploy` in the commands with your folder path.
 
-The user's private repository should be private. It is the operator workspace for this customer install.
-The generated `.gitignore` in the user's private repository keeps customer values, generated secrets, and deployment evidence out of commits.
+Your private repository should be **private**. It is the operator workspace for this customer install, and the `.gitignore` the installer generates there keeps customer values, generated secrets, and deployment evidence out of commits.
 
-If the repositories are not on your computer yet, ask your GitHub administrator for the two clone URLs. Then open a terminal in your chosen parent folder and clone both repositories.
+### Getting the two folders
 
-Example:
+If they are not on your computer yet, open a terminal in your chosen parent folder and run:
 
 ```bash
-git clone <B1Admin-source-repository-url> B1Admin
+git clone https://github.com/dhempler/b1admin-installer.git b1admin-installer
 git clone https://github.com/<owner>/<private-deploy-repo>.git b1admin-deploy
-cd B1Admin
+cd b1admin-installer
+npm install
 ```
 
-After `cd B1Admin`, the rest of this guide's commands should work as written.
+After `cd b1admin-installer`, the rest of this guide's commands work as written.
 
-If the repositories are already on your computer, do not clone them again. Open a terminal in the existing `B1Admin` folder instead.
+If you have not created the private repository on GitHub yet, do that first — see [Your private repository](./setup/deployment-repository.md). The installer can also scaffold its contents for you in a later step.
+
+If the folders already exist, do not clone them again. Open a terminal in the existing `b1admin-installer` folder instead.
+
+### Optional: a local Api checkout
+
+Not needed for the normal guided install. Only an advanced operator doing local backend packaging or migration work needs it, and it goes beside the other two:
+
+```text
+parent-folder/
+  b1admin-installer/
+  b1admin-deploy/
+  Api/                 <- optional; not needed for the normal guided path
+```
 
 ## Before You Run Commands Checklist
 
@@ -310,8 +301,8 @@ Before starting [The Short Version](#the-short-version), confirm:
 - [ ] Node.js and npm are installed.
 - [ ] You can access the B1Admin source repository.
 - [ ] You can access the Api source repository.
-- [ ] The user's private repository exists in GitHub and is private.
-- [ ] The user's private repository is cloned beside the B1Admin source repository.
+- [ ] Your private repository exists in GitHub and is private.
+- [ ] Your private repository is cloned beside this installer repository.
 - [ ] You know whether you are deploying `prod` only or optional `staging` first.
 - [ ] If using a custom frontend domain, you have the hostname, Route53 hosted zone ID, and CloudFront ACM certificate ARN.
 
@@ -335,17 +326,17 @@ Choose your first environment:
 Staging creates a second AWS stack, so it costs money while it is running. It is useful when you want a practice deployment before production, but it is not required.
 If you skip staging, the first real AWS deployment will be prod, so read the preview and preflight output carefully before approving the real deploy.
 
-1. Make sure the user's private repository exists in GitHub and is cloned beside the `B1Admin` source repository.
+1. Make sure your private repository exists in GitHub and is cloned beside this installer repository.
 
-Your folders should look like this before you continue:
+Your folders should look like this before you continue, and your terminal should be in `b1admin-installer`:
 
 ```text
 parent-folder/
-  B1Admin/
+  b1admin-installer/   <- run the commands here
   b1admin-deploy/
 ```
 
-2. Create the user's private repository workspace files:
+2. Create your private repository workspace files:
 
 ```bash
 npm run installer:init -- \
@@ -392,7 +383,7 @@ When it pauses, read the command it shows. If it looks right, answer `y` to let 
 If you are not sure, answer `n`; nothing is lost, and you can run `installer:run` again later.
 
 If the runner stops because an outside task is needed, such as a GitHub administrator approving production, complete that task and run the same `installer:run` command again.
-When the runner changes safe files in the user's private repository, it commits and pushes them for you in the `Private repository synced` step.
+When the runner changes safe files in your private repository, it commits and pushes them for you in the `Private repository synced` step.
 
 The runner does not create your AWS account, clone repositories to your computer, approve protected GitHub deployments, or decide whether a production change is safe. It guides those steps and pauses when a person should review them. It can create the AWS IAM roles and the private GitHub repository itself, and it always asks before doing so.
 
@@ -419,7 +410,7 @@ If you have not run `npm install` in the installer folder yet, do that before th
 
 In a small church or organization, all three roles below are usually the same person: you. That is fine. Read each role as "a hat I put on for that step" rather than a separate person you need to find. When a step says to send something to the AWS administrator or GitHub administrator and that is you, just do that step yourself with the same signed-in accounts you have been using.
 
-The deployment operator runs the installer commands, answers the customer setup questions, commits safe files to the user's private repository, dispatches workflows, and checks the final report.
+The deployment operator runs the installer commands, answers the customer setup questions, commits safe files to your private repository, dispatches workflows, and checks the final report.
 
 The AWS administrator creates or approves the IAM roles. If that is you (the normal case for a small organization), just approve the `AWS IAM roles created` step when the runner asks; it creates the roles with your own AWS sign-in.
 
@@ -431,7 +422,7 @@ If a separate person manages your AWS account, send them this generated file ins
 
 That file contains the AWS IAM commands and role ARN values needed by the deployment. They do not need to edit B1Admin code.
 
-The GitHub administrator may need to create the user's private repository, grant repository access, approve production environment protection rules, or create source-repository read tokens.
+The GitHub administrator may need to create your private repository, grant repository access, approve production environment protection rules, or create source-repository read tokens.
 
 ## Fill Out One File
 
@@ -454,7 +445,7 @@ It asks for:
 
 - AWS account ID
 - AWS region, normally `us-east-1`
-- user's private repository, for example `your-org/b1admin-deploy`
+- your private repository, for example `your-org/b1admin-deploy`
 - root domain, for example `example.com`; this is used for generated settings and support values even if you do not use a custom frontend hostname
 - support email and support phone
 - first admin email, temporary password, and church name
@@ -503,7 +494,7 @@ Use `staging` first when:
 
 Both paths use the same guided runner. The only difference is the `--environment=` value.
 
-For a normal prod-only install, use `prod` only. You can still keep the generated staging files in the user's private repository; they do not create AWS resources unless you run the staging deploy.
+For a normal prod-only install, use `prod` only. You can still keep the generated staging files in your private repository; they do not create AWS resources unless you run the staging deploy.
 
 ## Guided Prod Deploy
 
@@ -539,7 +530,7 @@ The prod flow normally does this:
 11. Bootstrap the first admin from the operator machine.
 12. Run browser smoke.
 
-Commit and push only safe files in the user's private repository when the installer asks for it. Do not commit `customer-values.json`, `app-config-secret.json`, `bootstrap-admin-secret.json`, or `deployment/`.
+Commit and push only safe files in your private repository when the installer asks for it. Do not commit `customer-values.json`, `app-config-secret.json`, `bootstrap-admin-secret.json`, or `deployment/`.
 
 ## Optional Guided Staging Deploy
 
@@ -662,7 +653,7 @@ Before considering the install complete, confirm:
 
 Use this when B1Admin source code has changed and you want to update an already installed AWS deployment.
 
-The user's private repository remains the deployment control center. The user should not push customer settings or deployment evidence back to the B1Admin source repository or the Api source repository.
+Your private repository remains the deployment control center. The user should not push customer settings or deployment evidence back to the B1Admin source repository or the Api source repository.
 
 Open a terminal in the local `B1Admin` source repository folder.
 
@@ -689,7 +680,7 @@ npm run installer:update -- \
 The update command will:
 
 - ask before pulling the latest B1Admin source repository code
-- refresh the user's private repository scaffold
+- refresh your private repository scaffold
 - show private repository changes if safe scaffold files changed
 - offer to commit and push safe private repository scaffold changes
 - start the guided prod deployment runner
@@ -787,7 +778,7 @@ If you are stuck, email `dennis.hempler@protonmail.com` with `B1Admin` in the su
 Common causes:
 
 - wrong GitHub account is authenticated in `gh`
-- user's private repository is not private or not accessible
+- your private repository is not private or not accessible
 - needed GitHub Environment is missing, normally `aws-prod` and, only if you use staging, `aws-staging`
 - GitHub Environment secrets are missing
 - AWS IAM role trust policy names the wrong repo or environment
@@ -799,6 +790,6 @@ Common causes:
 
 Use these only when you need detail beyond the guided path:
 
-- [User's private repository guide](./private-deployment-repo.md)
+- [Your private repository guide](./private-deployment-repo.md)
 - [GitHub Actions setup guide](./github-actions-setup.md)
 - [IAM setup guide](../iam/README.md)

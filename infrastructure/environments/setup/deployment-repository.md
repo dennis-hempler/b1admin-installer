@@ -2,7 +2,7 @@
 
 Create a private GitHub repository owned by the organization or team operating B1Admin. A name such as `b1admin-deploy` works well.
 
-This repository is the operator's deployment workspace. It lives beside the B1Admin source repository on the operator machine.
+This repository is the operator's deployment workspace. It lives beside the installer repository on the operator machine.
 
 The guided runner can create it for you: when the `Private repository synced` step runs, the installer creates the private GitHub repository if it does not exist yet and connects the local folder to it. If you prefer to create it yourself first, use the GitHub website or GitHub CLI.
 
@@ -24,11 +24,11 @@ Check the folder layout before running installer commands:
 
 ```text
 parent-folder/
-  B1Admin/
+  b1admin-installer/
   b1admin-deploy/
 ```
 
-Run installer commands from `B1Admin`, not from `b1admin-deploy`.
+Run installer commands from `b1admin-installer`, not from `b1admin-deploy`. You do not need a local copy of the B1Admin application source; the deployment checks it out on GitHub.
 
 It holds:
 
@@ -39,7 +39,7 @@ It holds:
 
 It does not need to contain application source changes, and the installer does not push environment settings back to the B1Admin or Api repositories.
 
-From a sibling B1Admin checkout, use the installer helper to scaffold the private repository and create the local customer worksheet:
+From the installer repository folder, use the installer helper to scaffold the private repository and create the local customer worksheet:
 
 ```bash
 npm run installer:init -- --deploy-repo-dir=../b1admin-deploy --output=markdown
@@ -56,7 +56,7 @@ The workflow has inputs for the source repositories it checks out:
 - `api_repo`, normally `ChurchApps/Api`
 - `api_ref`, normally `main`
 
-The full expected layout and workflow path adjustments are shown in the [user's private repository guide](../private-deployment-repo.md).
+The full expected layout and workflow path adjustments are shown in the [private repository reference](../private-deployment-repo.md).
 
 Commit and push the safe scaffold files before any workflow dispatch:
 
@@ -68,7 +68,7 @@ git -C ../b1admin-deploy push
 
 You are ready when the private repository contains the workflow and environment folders, and the repository's Actions tab shows the `Deploy AWS From Private Repo` workflow.
 
-If the Actions tab does not show the workflow after pushing, confirm that the workflow file exists at `.github/workflows/deploy-aws-self-hosted.yml` in the user's private repository and that GitHub Actions are enabled for that repository.
+If the Actions tab does not show the workflow after pushing, confirm that the workflow file exists at `.github/workflows/deploy-aws-self-hosted.yml` in your private repository and that GitHub Actions are enabled for that repository.
 
 After the first install, keep using this private repository for updates. The normal update command is:
 

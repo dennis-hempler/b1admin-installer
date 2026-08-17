@@ -20,7 +20,7 @@ npm run installer:doctor -- --repo=<owner>/<deploy-repo> --output=markdown
 
 What good output looks like:
 
-- `gh auth status` shows you are logged in to the GitHub account that can access the user's private repository.
+- `gh auth status` shows you are logged in to the GitHub account that can access your private repository.
 - `gh repo view <owner>/<deploy-repo>` prints repository information instead of `not found` or `HTTP 404`.
 - `installer:doctor` can read the repository and does not report a GitHub authentication blocker.
 
@@ -29,7 +29,7 @@ Common fixes:
 - If `gh` is not found, install GitHub CLI and open a new terminal.
 - If the wrong GitHub account is signed in, run `gh auth logout`, then `gh auth login`.
 - If the repository is not found, confirm the repository name and ask the GitHub administrator to grant your account access.
-- If the repository exists but Actions are disabled, enable Actions in the user's private repository settings.
+- If the repository exists but Actions are disabled, enable Actions in your private repository settings.
 
 You are ready when both checks succeed. Authentication to a different GitHub account is a common cause of repository or workflow lookup failures.
 

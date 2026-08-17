@@ -9,9 +9,9 @@ This folder is reference material for the installer. New installers should not s
 - [`start-here.md`](./start-here.md): the main step-by-step guide for a new installer.
 - [`operations.md`](./operations.md): what to do after launch - updates, version pinning, backups, secrets, and cost control.
 - [`setup/`](./setup): short prerequisite explanations linked from the main guide. Start with [`setup/aws-new-account.md`](./setup/aws-new-account.md) when the AWS account is brand new.
-- [`prod/`](./prod): checked-in production starter files copied into the user's private repository.
-- [`staging/`](./staging): optional practice-environment starter files copied into the user's private repository.
-- [`private-deployment-repo.md`](./private-deployment-repo.md): reference guide for the user's private repository.
+- [`prod/`](./prod): checked-in production starter files copied into your private repository.
+- [`staging/`](./staging): optional practice-environment starter files copied into your private repository.
+- [`private-deployment-repo.md`](./private-deployment-repo.md): reference guide for your private repository.
 - [`github-actions-setup.md`](./github-actions-setup.md): lower-level GitHub Actions reference.
 - [`first-rollout-checklist.md`](./first-rollout-checklist.md): detailed verification checklist after a deploy.
 
@@ -27,9 +27,9 @@ npm run installer:run -- --deploy-repo-dir=../b1admin-deploy --deploy-env-dir=..
 
 Use `--environment=staging` only when you intentionally want the optional practice deployment before prod.
 
-## Files Copied To The User's Private Repository
+## Files Copied To Your Private Repository
 
-The installer copies the starter files into the user's private repository. That private copy becomes the live customer workspace.
+The installer copies the starter files into your private repository. That private copy becomes the live customer workspace.
 
 Each environment starter includes:
 

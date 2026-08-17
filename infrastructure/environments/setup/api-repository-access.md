@@ -26,12 +26,12 @@ Optional local Api checkout:
 
 ```text
 parent-folder/
-  B1Admin/
+  b1admin-installer/
   b1admin-deploy/
   Api/
 ```
 
-Use a local `../Api` checkout only for advanced local packaging, local migration work, or troubleshooting. If you do clone it locally, keep it beside `B1Admin`, not inside the user's private repository.
+Use a local `../Api` checkout only for advanced local packaging, local migration work, or troubleshooting. If you do clone it locally, keep it beside `b1admin-installer`, not inside your private repository.
 
 You are ready when the workflow identity can read the Api source repository and the deployment will use the intended branch, tag, or commit, normally `main`.
 

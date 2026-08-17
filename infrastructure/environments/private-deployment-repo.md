@@ -1,4 +1,4 @@
-# User's Private Repository
+# Your Private Repository
 
 Use a private deployment repository for real customer installs.
 
@@ -21,7 +21,7 @@ Create a private GitHub repository such as:
 your-org/b1admin-deploy
 ```
 
-From a sibling B1Admin checkout, create the private repo scaffold and local customer worksheet:
+From the installer repository folder, create the private repo scaffold and local customer worksheet:
 
 ```bash
 npm run installer:init -- \
@@ -124,7 +124,7 @@ Use `--environment=staging` only if you intentionally chose the optional practic
 
 ## Updating Later
 
-After the first install is complete, update the AWS deployment from the sibling B1Admin source repository with:
+After the first install is complete, update the AWS deployment from the installer repository folder with:
 
 ```bash
 npm run installer:update -- \
@@ -144,7 +144,7 @@ Do not commit `customer-values.json`, `app-config-secret.json`, `bootstrap-admin
 
 ## OIDC Trust
 
-The AWS OIDC trust policy should reference the user's private repository, not the B1Admin source repository:
+The AWS OIDC trust policy should reference your private repository, not the B1Admin source repository:
 
 ```json
 {
