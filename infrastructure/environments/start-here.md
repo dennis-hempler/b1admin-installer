@@ -103,7 +103,7 @@ If you are not sure whether something is ready, use the quick checks in this sec
 
 You need an AWS account where B1Admin is allowed to create resources.
 
-**Starting from a brand-new AWS account, or never run AWS commands in a terminal before?** Work through [Setting up a brand-new AWS account](./setup/aws-new-account.md) first. It covers creating the account, protecting the root user, setting a billing alert, creating a sign-in you can use from the terminal, and connecting the AWS CLI. The rest of this section assumes those are done.
+**Starting from a brand-new AWS account, or never run AWS commands in a terminal before?** Work through [Setting up a brand-new AWS account](./setup/aws-new-account.md) first. It covers creating the account, protecting the root user, setting a billing alert, choosing your region, creating a sign-in you can use from the terminal, and connecting the AWS CLI. The rest of this section assumes those are done.
 
 Have:
 

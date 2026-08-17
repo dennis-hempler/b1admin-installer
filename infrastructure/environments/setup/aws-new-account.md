@@ -36,7 +36,7 @@ AWS asks you to choose a support plan. **Basic Support** is free and is enough f
 
 Sign in as the root user and turn on multi-factor authentication (MFA). In the AWS console this is under your account name (top right) > **Security credentials** > **Multi-factor authentication (MFA)**. An authenticator app on your phone is the easiest option.
 
-Then **stop using the root user.** After this page you will not need it again for a normal install. Everything else uses the sign-in you create in step 4.
+Then **stop using the root user.** After this page you will not need it again for a normal install. Everything else uses the sign-in you create in step 5.
 
 Root access is worth protecting carefully: it can close the account, change billing, and undo any restriction you set elsewhere.
 
@@ -48,7 +48,23 @@ In the AWS console go to **Billing and Cost Management** > **Budgets** > **Creat
 
 This is the single cheapest thing you can do to avoid a surprise. A misconfiguration that leaves resources running is much easier to catch in week one than in month three.
 
-## Step 4: Create A Sign-In You Can Use From The Terminal
+## Step 4: Choose Your Region
+
+Do this before creating your sign-in. Some of what comes next is permanent and inherits whatever region you happen to be looking at.
+
+A region is the physical location your data and servers live in. Pick one and use it consistently; mixing regions is a common cause of confusing failures.
+
+Use `us-east-1` unless you have a reason not to. It is the default everywhere in this guide, and it avoids one specific complication: if you later add your own domain name, the certificate for it **must** live in `us-east-1` regardless of where everything else runs. Choosing `us-east-1` for everything keeps that from being something you have to think about.
+
+If you do choose a different region, keep in mind:
+
+- use the same region every time you are asked for one, including in `customer-values.json`
+- a frontend certificate still has to be created in `us-east-1`
+- not every AWS feature exists in every region
+
+**Set the console to that region now**, using the region menu in the top-right corner of the AWS console. The next step reads it and cannot be changed afterward.
+
+## Step 5: Create A Sign-In You Can Use From The Terminal
 
 The root user cannot be used for the installer, and should not be. You need a separate identity with permission to create AWS resources.
 
@@ -58,14 +74,26 @@ There are two ways. Pick one.
 
 This gives you logins that expire on their own, so there is no permanent password or key sitting on your computer. It is AWS's recommended approach and it is what larger organizations expect.
 
-In the AWS console, search for **IAM Identity Center** and enable it. Then:
+Check the region menu in the top-right corner of the console first. It must already say the region you chose in step 4 — Identity Center's home region is set from it and **can never be changed**.
 
-1. Create a user for yourself, with your real email address.
-2. Create a permission set. For a first install, use the predefined **AdministratorAccess** permission set — see the note on permissions below.
-3. Assign your user to the account with that permission set.
-4. Note the **AWS access portal URL** that Identity Center shows you. You will need it in step 5.
+Search the console for **IAM Identity Center** and choose **Enable**.
 
-You will receive an email to set your password and enroll in MFA.
+**Enable is not a single click.** A confirmation page appears with an *Instance configuration* choice, and the pre-selected option is not the one you want:
+
+- **Multi-Region instance** is pre-selected. It copies your instance to a second region and encrypts it with a key you own, which carries an ongoing charge — the page says so, in a yellow "AWS KMS charges apply" box.
+- **Single-Region instance** is the right choice for a B1Admin install. It uses a key AWS manages at no cost. Selecting it makes the KMS warning disappear.
+
+Check that **Primary Region** on that page shows the region from step 4 before continuing. If it does not, cancel, change the region in the top-right menu, and start again — this value is marked *"Can be changed later: No"*.
+
+Then create the sign-in itself. **All three parts are required.** A user on its own can sign in to nothing:
+
+1. **Create a user** for yourself under **Users**, with your real email address. Leave the password option on *Send an email to this user with password setup instructions* — you set your own password, and nobody else ever sees it. The emailed link is valid for 7 days.
+2. **Create a permission set** under **Permission sets**. Choose *Predefined permission set* and **AdministratorAccess** — see the note on permissions below. The default session duration is 1 hour, which means signing in again every hour while you work; **4 hours** is a more comfortable choice for an install day.
+3. **Assign the user to the account.** Go to **AWS accounts**, tick your account, choose **Assign users or groups**, pick your user, then pick the permission set. Skipping this is the most common mistake: `aws configure sso` will happily sign you in and then show an empty list of accounts.
+
+Finally, note the **AWS access portal URL** shown on the Identity Center dashboard. You need it in step 6.
+
+> **A false alarm to expect.** After a successful assignment, the permission set's summary box may still read **"Not provisioned"**, and stay that way even after refreshing. Ignore it. The reliable indicator is the **AWS accounts** tab on the permission set, which will list your account with the status **Up to date**. Do not re-run the assignment trying to clear the header.
 
 ### Option B: An IAM User With Access Keys (simpler)
 
@@ -88,7 +116,7 @@ The installer genuinely needs broad permissions: it creates IAM roles, networkin
 
 If your organization requires tighter permissions, the exact actions the deployment itself needs are listed in the sample policies under [`infrastructure/iam/`](../../iam/README.md). Those policies cover the deployment. The person running the installer additionally needs to be able to create IAM roles.
 
-## Step 5: Connect The AWS CLI
+## Step 6: Connect The AWS CLI
 
 Install the AWS CLI if you have not already: [download](https://aws.amazon.com/cli/). Open a new terminal afterward so it is on your path.
 
@@ -96,7 +124,7 @@ Install the AWS CLI if you have not already: [download](https://aws.amazon.com/c
 aws --version
 ```
 
-Now connect it to your account, matching the option you chose in step 4.
+Set your password first if you chose Option A — use the link in the invitation email, and enroll in MFA when prompted. Then connect the CLI, matching the option you chose in step 5.
 
 ### If you chose Option A (Identity Center)
 
@@ -104,13 +132,15 @@ Now connect it to your account, matching the option you chose in step 4.
 aws configure sso
 ```
 
-It asks for the **AWS access portal URL** from step 4 and an SSO region, opens your browser to sign in, then asks which account and permission set to use. When it asks for a **profile name**, the simplest choice is `default` — the installer then works with no extra setup.
+It asks for the **AWS access portal URL** from step 5, then an **SSO region**. The SSO region is where Identity Center itself lives, which — if you followed step 4 — is the same region you are deploying into. It then opens your browser to sign in and asks which account and permission set to use. When it asks for a **profile name**, the simplest choice is `default` — the installer then works with no extra setup.
 
 If you give it any other name, you must tell every terminal session to use it:
 
 ```bash
 export AWS_PROFILE=<your-profile-name>
 ```
+
+The installer scripts do not take a `--profile` option — they use whatever profile the terminal is already set to, which is why naming it `default` is simplest.
 
 Identity Center sessions expire. When commands start failing with an expired-token message, run `aws sso login` and continue.
 
@@ -120,34 +150,24 @@ Identity Center sessions expire. When commands start failing with an expired-tok
 aws configure
 ```
 
-Enter the access key ID and secret access key from step 4. For **Default region name** enter your region from step 6 — normally `us-east-1`. For **Default output format** enter `json`.
+Enter the access key ID and secret access key from step 5. For **Default region name** enter your region from step 4 — normally `us-east-1`. For **Default output format** enter `json`.
 
 ### Either way, check it worked
 
 ```bash
 aws sts get-caller-identity
+aws configure get region
 ```
 
-This should print a block of JSON containing `"Account"` followed by your 12-digit account number. If it does, the hard part is over — every other AWS page in this guide starts from here.
-
-## Step 6: Choose Your Region
-
-A region is the physical location your data and servers live in. Pick one and use it consistently; mixing regions is a common cause of confusing failures.
-
-Use `us-east-1` unless you have a reason not to. It is the default everywhere in this guide, and it avoids one specific complication: if you later add your own domain name, the certificate for it **must** live in `us-east-1` regardless of where everything else runs. Choosing `us-east-1` for everything keeps that from being something you have to think about.
-
-If you do choose a different region, keep in mind:
-
-- use the same region every time you are asked for one, including in `customer-values.json`
-- a frontend certificate still has to be created in `us-east-1`
-- not every AWS feature exists in every region
-
-Set it as your default so you do not have to pass it every time:
+The first should print a block of JSON containing `"Account"` followed by your 12-digit account number, and the second your region. If the region is blank, set it:
 
 ```bash
 aws configure set region us-east-1
-aws configure get region
 ```
+
+**Check the account number carefully.** If you have more than one AWS account, this is the moment to confirm the CLI is pointed at the one you intend to deploy into — the installer acts on whatever this command reports, not on whatever account your browser happens to be showing. The two can differ.
+
+Once both commands look right, the hard part is over — every other AWS page in this guide starts from here.
 
 ## Step 7: Your Own Domain Name (optional, can be done later)
 
@@ -180,17 +200,20 @@ Write down the account number. You will be asked for it as `<aws-account-id>` th
 ## Common Fixes
 
 - **`aws: command not found`** — the AWS CLI is not installed, or the terminal was open before you installed it. Install it and open a new terminal.
-- **`Unable to locate credentials`** — step 5 has not been completed in this terminal. If you used a named profile, set `AWS_PROFILE`.
+- **`Unable to locate credentials`** — step 6 has not been completed in this terminal. If you used a named profile, set `AWS_PROFILE`.
 - **`The security token included in the request is expired`** — an Identity Center session ran out. Run `aws sso login`.
 - **`InvalidClientTokenId` or `SignatureDoesNotMatch`** — the access key was mistyped or has been deleted. Run `aws configure` again, or create a new access key.
-- **The account number is wrong** — you are signed in to a different AWS account. Stop and switch before running anything that creates resources; deploying into the wrong account is tedious to unwind.
+- **`aws configure sso` signs you in but lists no accounts** — the user exists but has no access yet. Part 2 or part 3 of step 5 Option A is missing: a permission set has to exist *and* be assigned to your account.
+- **The permission set says "Not provisioned"** — usually nothing is wrong. Open the permission set's **AWS accounts** tab; if your account is listed as **Up to date**, the assignment worked and the summary box is just stale.
+- **The account number is wrong** — you are signed in to a different AWS account. Stop and switch before running anything that creates resources; deploying into the wrong account is tedious to unwind. Note that your terminal and your browser can be signed in to *different* accounts at the same time; the installer follows the terminal.
 - **Errors that mention your account is not verified, or resource creation fails for no clear reason on a very new account** — verification from step 1 has probably not finished. Wait for the confirmation email and try again.
-- **`AccessDenied` when the installer creates IAM roles** — the identity from step 4 does not have permission to create roles. Review the permissions note in step 4.
+- **`AccessDenied` when the installer creates IAM roles** — the identity from step 5 does not have permission to create roles. Review the permissions note in step 5.
 
 ## You Are Ready When
 
-- `aws sts get-caller-identity` prints the account where B1Admin will run
+- `aws sts get-caller-identity` prints the account where B1Admin will run — and you have checked it is the right one
 - `aws configure get region` prints the region you chose
+- if you used Identity Center, `aws configure sso` listed your account and the `AdministratorAccess` role, rather than an empty list
 - the root user has MFA turned on and you are no longer signed in as root
 - a billing alert exists
 
