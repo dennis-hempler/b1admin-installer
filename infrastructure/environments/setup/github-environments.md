@@ -10,7 +10,7 @@ If you choose the optional staging deployment, also create:
 
 - `aws-staging`
 
-You can also create or update the environments from the B1Admin checkout:
+You can also create or update the environments from the `b1admin-installer` folder:
 
 ```bash
 npm run installer:github-setup -- --repo=<owner>/<private-deploy-repo> --write=true --output=markdown

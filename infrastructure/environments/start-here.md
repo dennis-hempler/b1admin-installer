@@ -308,7 +308,7 @@ Before starting [The Short Version](#the-short-version), confirm:
 
 ## The Short Version
 
-Run commands from the `B1Admin` source repository folder.
+Run commands from the `b1admin-installer` folder.
 
 If you are not sure where your terminal is, run:
 
@@ -316,7 +316,7 @@ If you are not sure where your terminal is, run:
 pwd
 ```
 
-The output should end with `B1Admin`. If it does not, move into the `B1Admin` source repository folder before continuing.
+The output should end with `b1admin-installer`. If it does not, move into the `b1admin-installer` folder before continuing.
 
 Choose your first environment:
 
@@ -655,7 +655,7 @@ Use this when B1Admin source code has changed and you want to update an already 
 
 Your private repository remains the deployment control center. The user should not push customer settings or deployment evidence back to the B1Admin source repository or the Api source repository.
 
-Open a terminal in the local `B1Admin` source repository folder.
+Open a terminal in the `b1admin-installer` folder.
 
 If you are not sure you are in the right place, run:
 
@@ -663,7 +663,7 @@ If you are not sure you are in the right place, run:
 pwd
 ```
 
-The output should end with `B1Admin`.
+The output should end with `b1admin-installer`.
 
 Then run one command:
 

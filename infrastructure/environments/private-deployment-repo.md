@@ -108,7 +108,7 @@ npm run installer:github-setup -- --environment=prod --repo=<owner>/<private-dep
 
 ## Normal Commands
 
-Run these from the B1Admin checkout:
+Run these from the `b1admin-installer` folder:
 
 ```bash
 export DEPLOY_REPO=<owner>/<private-deploy-repo>

@@ -14,7 +14,7 @@ export DEPLOY_ENV_DIR=../b1admin-deploy/environments
 1. Confirm all `replace-me` placeholders and starter-only default values such as `example.com`, `support@example.com`, `mailto:support@example.com`, and `555-555-5555` are gone from the target environment folder.
 2. Run `npm run installer:configure -- --environment=<environment> --environment-dir="$DEPLOY_ENV_DIR/<environment>" --account-id=<aws-account-id> --output=markdown` if you want one last reviewable replacement pass before touching AWS.
 3. Run `npm run installer:preflight -- --environment=<environment> --environment-dir="$DEPLOY_ENV_DIR/<environment>" --repo="$DEPLOY_REPO" --output=markdown` and clear every blocker before dispatching.
-4. If the plan recommends `api-repo`, confirm the Api repo at `../Api` has already run `corepack yarn install`.
+4. If the plan recommends `api-repo` and you are deploying from this computer rather than GitHub Actions, confirm the Api checkout at `../Api` exists and has run `corepack yarn install`. The normal GitHub Actions dispatch checks the Api repository out itself and needs no local copy.
 5. If the plan recommends `package-manifest` or `backend-artifact`, confirm those referenced files already exist and are readable from the machine or runner you will use.
 6. If you are still using the local script with `API_REPO_PATH`, confirm that the checkout and its `package.json` are readable from the current shell, not just present on disk.
 7. Confirm the target AWS account, region, ACM certificates, and Route53 zones are the ones you intend to change.
