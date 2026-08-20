@@ -39,15 +39,19 @@ function toCamelCase(name) {
   return name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
 }
 
+// Bare runs (`npm run installer:run` with no flags) pass no --customer-file, so
+// the lookup must fall back to the file's standard location in the deploy repo.
+// Without this fallback every customer-value check read empty and the guided
+// runner looped forever on "answer the customer setup questions".
+function defaultCustomerFile() {
+  const deployRepoDir = rawCliArg("deploy-repo-dir") || process.env.DEPLOY_REPO_DIR || "../b1admin-deploy";
+  return path.join(deployRepoDir, "customer-values.json");
+}
+
 function loadCustomerValues() {
   if (customerValuesCache !== undefined) return customerValuesCache;
 
-  const customerFile = rawCliArg("customer-file") || process.env.CUSTOMER_FILE || "";
-  if (!customerFile) {
-    customerValuesCache = null;
-    return customerValuesCache;
-  }
-
+  const customerFile = rawCliArg("customer-file") || process.env.CUSTOMER_FILE || defaultCustomerFile();
   const resolvedFile = path.resolve(rootDir, customerFile);
   if (!fs.existsSync(resolvedFile)) {
     customerValuesCache = null;

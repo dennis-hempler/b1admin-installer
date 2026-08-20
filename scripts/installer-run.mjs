@@ -111,10 +111,28 @@ function isApprovalGate(command) {
     || command.includes("installer:report");
 }
 
-function renderStep(step, check, gated) {
+function checklistProgress(state, nextCheck) {
+  const checks = Array.isArray(state.checks) ? state.checks : [];
+  if (checks.length === 0) return null;
+  return {
+    done: checks.filter((check) => check.ok).length,
+    total: checks.length,
+    position: nextCheck ? checks.indexOf(nextCheck) + 1 : 0,
+  };
+}
+
+function progressLine(progress) {
+  return progress ? `Checklist: ${progress.done} of ${progress.total} items done.` : "";
+}
+
+function renderStep(check, gated, progress) {
+  const heading = progress && progress.position > 0
+    ? `Next up (item ${progress.position} of ${progress.total}): ${check?.label || "Next command"}`
+    : `Next up: ${check?.label || "Next command"}`;
   const lines = [
     "",
-    `Step ${step}: ${check?.label || "Next command"}`,
+    progressLine(progress),
+    heading,
     check?.detail ? `Status: ${check.detail}` : "",
     gated ? "Approval: this step can change AWS/GitHub state, create a login, launch browser testing, or write sign-off evidence." : "",
     "Command:",
@@ -124,34 +142,28 @@ function renderStep(step, check, gated) {
 }
 
 async function shouldRun(rl, command, options) {
-  const gated = isApprovalGate(command);
   if (options.dryRun) return false;
-  if (options.yes && (!gated || options.approveGates)) return true;
+  // Routine steps run without asking. The runner only stops for a person when a
+  // step can change AWS/GitHub state (gated), fails, or stalls.
+  if (!isApprovalGate(command)) return true;
+  if (options.approveGates) return true;
 
   // Without a terminal there is nobody to answer, and awaiting the question would
   // hang forever on a live pipe or exit silently on closed stdin. Say so instead.
   if (!process.stdin.isTTY) {
-    const reason = gated
-      ? "This step needs approval before it can change AWS or GitHub state."
-      : "This step needs a yes or no answer.";
     throw new Error([
-      `${reason} No terminal is attached, so the question cannot be asked.`,
+      "This step needs approval before it can change AWS or GitHub state. No terminal is attached, so the question cannot be asked.",
       "",
       "Run this command yourself:",
       `  ${command}`,
       "",
-      gated
-        ? "Or re-run the installer in a terminal, adding --approve-gates to pre-approve steps like this one."
-        : "Or re-run the installer in a terminal, adding --yes to answer these automatically.",
+      "Or re-run the installer in a terminal, adding --approve-gates to pre-approve steps like this one.",
     ].join("\n"));
   }
 
-  const suffix = gated ? " [y/N]" : " [Y/n]";
-  const answer = await rl.question(`Run this command now?${suffix}: `);
+  const answer = await rl.question("Run this command now? [y/N]: ");
   if (answer === null || answer === undefined) return false;
-  const raw = answer.trim().toLowerCase();
-  if (!raw) return !gated;
-  return ["y", "yes"].includes(raw);
+  return ["y", "yes"].includes(answer.trim().toLowerCase());
 }
 
 function runStart() {
@@ -164,14 +176,16 @@ function runStart() {
 
 async function main() {
   const outputMode = getArg("output", "text").toLowerCase();
+  // --yes is still accepted (and stripped by runnerArgs) but no longer read:
+  // routine steps always run without asking now, which is what it used to enable.
   const options = {
     approveGates: boolArg("approve-gates", false),
     dryRun: boolArg("dry-run", false),
     maxSteps: Number(getArg("max-steps", "30")),
-    yes: boolArg("yes", false),
   };
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const history = [];
+  let lastRun = null;
 
   try {
     for (let step = 1; step <= options.maxSteps; step += 1) {
@@ -180,12 +194,36 @@ async function main() {
       const nextCheck = state.checks?.find((check) => !check.ok && check.command === nextCommand)
         || state.checks?.find((check) => !check.ok)
         || null;
+      const progress = checklistProgress(state, nextCheck);
 
       if (state.ok || !nextCommand || nextCommand.startsWith("#")) {
         history.push({ step, action: "complete", command: nextCommand });
         if (outputMode === "json") printJson({ ok: true, complete: true, history, state });
-        else console.log(nextCommand || "Installer run complete.");
+        else console.log([progressLine(progress), nextCommand || "Installer run complete."].filter(Boolean).join("\n"));
         return;
+      }
+
+      // A command that exits 0 without clearing the checklist item it was meant
+      // to fix would otherwise re-run forever with only the step number changing.
+      // Stop and say so instead; label is compared too because several checklist
+      // items legitimately share one command (the customer-values questionnaire).
+      if (lastRun && lastRun.command === nextCommand && lastRun.label === (nextCheck?.label || "")) {
+        history.push({ step, action: "stalled", command: nextCommand });
+        if (outputMode === "json") {
+          printJson({ ok: false, complete: false, stalled: true, command: nextCommand, check: nextCheck?.label || "", history, state });
+        } else {
+          console.error([
+            "",
+            "The last command finished successfully, but the installer still reports the same checklist item as incomplete:",
+            `  ${nextCheck?.label || nextCommand}`,
+            "",
+            "Stopping instead of running it again — repeating it would not help.",
+            "This usually means the installer is not detecting that step's result, which is a bug in the installer itself.",
+            "Please report it to the B1Admin team, including this command:",
+            `  ${nextCommand}`,
+          ].join("\n"));
+        }
+        process.exit(1);
       }
 
       const invocation = invocationFromCommand(nextCommand);
@@ -196,16 +234,21 @@ async function main() {
         process.exit(1);
       }
 
-      if (outputMode !== "json") console.log(renderStep(step, nextCheck, isApprovalGate(nextCommand)));
+      const gated = isApprovalGate(nextCommand);
+      if (outputMode !== "json") {
+        console.log(renderStep(nextCheck, gated, progress));
+        if (!gated && !options.dryRun) console.log("Running it now (no action needed).");
+      }
       const runIt = await shouldRun(rl, nextCommand, options);
       if (!runIt) {
         history.push({ step, action: "paused", command: nextCommand });
         if (outputMode === "json") printJson({ ok: true, complete: false, paused: true, command: nextCommand, history, state });
-        else console.log("Paused. Run installer:run again when you are ready to continue.");
+        else console.log([progressLine(progress), "Paused. Run installer:run again when you are ready to continue."].filter(Boolean).join("\n"));
         return;
       }
 
       history.push({ step, action: "run", command: nextCommand });
+      lastRun = { command: nextCommand, label: nextCheck?.label || "" };
       // On Windows, npm is a .cmd shim that spawnSync cannot execute without a shell.
       // Quoting only args containing whitespace left cmd.exe metacharacters live, so
       // any arg with a character cmd treats specially is quoted, and embedded quotes

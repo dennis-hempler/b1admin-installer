@@ -384,7 +384,8 @@ npm run installer:run -- \
 ```
 
 The runner checks what is already done, runs the next installer step, then checks again.
-It pauses before approval steps such as GitHub secret writes, production deploys, first-admin bootstrap, browser smoke, and final sign-off.
+Routine steps run on their own without asking; you will see each one announced with "Running it now (no action needed)."
+It pauses and asks only before approval steps such as GitHub secret writes, production deploys, first-admin bootstrap, browser smoke, and final sign-off.
 
 Starting the runner does not mean AWS resources are created immediately. The runner will first check files, GitHub setup, AWS readiness, and preflight results. AWS resources are created when you approve the real deploy step.
 
@@ -392,6 +393,7 @@ When it pauses, read the command it shows. If it looks right, answer `y` to let 
 If you are not sure, answer `n`; nothing is lost, and you can run `installer:run` again later.
 
 If the runner stops because an outside task is needed, such as a GitHub administrator approving production, complete that task and run the same `installer:run` command again.
+If the runner stops with "the installer still reports the same checklist item as incomplete", a step ran but the installer could not see its result. That is a bug in the installer, not something you did wrong; report it to the B1Admin team along with the command the message shows.
 When the runner changes safe files in your private repository, it commits and pushes them for you in the `Private repository synced` step.
 
 The runner does not create your AWS account, clone repositories to your computer, approve protected GitHub deployments, or decide whether a production change is safe. It guides those steps and pauses when a person should review them. It can create the AWS IAM roles and the private GitHub repository itself, and it always asks before doing so.
@@ -399,7 +401,8 @@ The runner does not create your AWS account, clone repositories to your computer
 Example runner pause:
 
 ```text
-Step 4: GitHub readiness
+Checklist: 13 of 20 items done.
+Next up (item 11 of 20): GitHub readiness
 Status: confirm GitHub Environments and required secrets
 Approval: this step can change AWS/GitHub state, create a login, launch browser testing, or write sign-off evidence.
 Command:
