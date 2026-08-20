@@ -1,26 +1,18 @@
-# Private Deployment Repository
+# Your Private Repository
 
-Create a private GitHub repository owned by the organization or team operating B1Admin. A name such as `b1admin-deploy` works well.
+Every install gets one private GitHub repository of its own. It is the deployment control center: it holds the deployment workflow, the environment parameter files, the GitHub Environments and their secrets, and the workflow run history. A name such as `b1admin-deploy` works well.
 
-This repository is the operator's deployment workspace. It lives beside the installer repository on the operator machine.
+It does **not** hold application source code, and nothing in it gets pushed back to the B1Admin or Api repositories.
 
-The guided runner can create it for you: when the `Private repository synced` step runs, the installer creates the private GitHub repository if it does not exist yet and connects the local folder to it. If you prefer to create it yourself first, use the GitHub website or GitHub CLI.
+## Create It
 
-Run this from the parent folder that will contain both repositories:
+Create the repository first — nothing else in the install can proceed without it. From your parent folder (the one that holds `b1admin-installer`):
 
 ```bash
 gh repo create <owner>/b1admin-deploy --private --clone
 ```
 
-If you use the GitHub website, clone it from that same parent folder before continuing:
-
-```bash
-git clone https://github.com/<owner>/b1admin-deploy.git b1admin-deploy
-```
-
-The HTTPS address above works with the same GitHub CLI sign-in you already have. Only use the SSH form (`git@github.com:...`) if you have already set up SSH keys with GitHub.
-
-Check the folder layout before running installer commands:
+Replace `<owner>` with your GitHub user or organization name. This creates the repository on GitHub **and** clones it beside the installer, which is exactly the layout the commands expect:
 
 ```text
 parent-folder/
@@ -28,37 +20,41 @@ parent-folder/
   b1admin-deploy/
 ```
 
-Run installer commands from `b1admin-installer`, not from `b1admin-deploy`. You do not need a local copy of the B1Admin application source; the deployment checks it out on GitHub.
+If you prefer the GitHub website, create a new **private** repository there instead, then clone it from the parent folder:
 
-It holds:
+```bash
+git clone https://github.com/<owner>/b1admin-deploy.git b1admin-deploy
+```
 
-- the deployment workflow
-- prod parameter files and optional staging parameter files
-- GitHub Environments and their secrets
-- an ignored local `deployment/` folder for downloaded workflow evidence, browser-smoke results, and final rollout reports
+The HTTPS address works with the same GitHub CLI sign-in you already have. Only use the SSH form (`git@github.com:...`) if you have already set up SSH keys with GitHub.
 
-It does not need to contain application source changes, and the installer does not push environment settings back to the B1Admin or Api repositories.
+If you skip this step, the guided runner can also create the repository for you when the `Private repository synced` step runs — but creating it up front keeps the folder layout obvious from the start.
 
-From the installer repository folder, use the installer helper to scaffold the private repository and create the local customer worksheet:
+## Fill It
+
+From the `b1admin-installer` folder, scaffold the contents and create the local customer worksheet:
 
 ```bash
 npm run installer:init -- --deploy-repo-dir=../b1admin-deploy --output=markdown
 ```
 
-That places [`private-deployment-workflow.sample.yml`](../private-deployment-workflow.sample.yml) at `.github/workflows/deploy-aws-self-hosted.yml`, copies [`private-deployment-gitignore.sample`](../private-deployment-gitignore.sample) to `.gitignore`, creates a short private-repo README, copies the tracked `staging` and `prod` starter files into an `environments` folder, and creates `customer-values.json` if it does not already exist.
+That creates:
 
-Do not commit `customer-values.json`, `app-config-secret.json`, `bootstrap-admin-secret.json`, or `deployment/`. Keep runtime secrets in GitHub Environment secrets.
+```text
+b1admin-deploy/
+  .github/workflows/deploy-aws-self-hosted.yml
+  .gitignore
+  README.md
+  customer-values.json
+  customer-values.sample.json
+  environments/
+    staging/
+    prod/
+```
 
-The workflow has inputs for the source repositories it checks out:
+The generated `.gitignore` keeps `customer-values.json`, `environments/*/app-config-secret.json`, `environments/*/bootstrap-admin-secret.json`, and `deployment/` out of commits. Runtime secret values belong in GitHub Environment secrets or in an operator-controlled local step, never in Git.
 
-- `b1admin_repo`, normally `ChurchApps/B1Admin`
-- `b1admin_ref`, normally `main`
-- `api_repo`, normally `ChurchApps/Api`
-- `api_ref`, normally `main`
-
-The full expected layout and workflow path adjustments are shown in the [private repository reference](../private-deployment-repo.md).
-
-Commit and push the safe scaffold files before any workflow dispatch:
+Commit and push the safe scaffold files before any workflow dispatch (the guided runner offers to do this for you in the `Private repository synced` step):
 
 ```bash
 git -C ../b1admin-deploy add README.md .gitignore .github/workflows/deploy-aws-self-hosted.yml customer-values.sample.json environments
@@ -66,11 +62,34 @@ git -C ../b1admin-deploy commit -m "Add B1Admin deployment scaffold"
 git -C ../b1admin-deploy push
 ```
 
-You are ready when the private repository contains the workflow and environment folders, and the repository's Actions tab shows the `Deploy AWS From Private Repo` workflow.
+You are ready when the repository contains the workflow and environment folders, and its Actions tab shows the `Deploy AWS From Private Repo` workflow. If the Actions tab does not show it after pushing, confirm the file exists at `.github/workflows/deploy-aws-self-hosted.yml` and that GitHub Actions are enabled for the repository.
 
-If the Actions tab does not show the workflow after pushing, confirm that the workflow file exists at `.github/workflows/deploy-aws-self-hosted.yml` in your private repository and that GitHub Actions are enabled for that repository.
+## What The Workflow Checks Out
 
-After the first install, keep using this private repository for updates. The normal update command is:
+The workflow checks out three things when it runs: your private repository, the B1Admin source (normally `ChurchApps/B1Admin`), and the Api source (normally `ChurchApps/Api`). The workflow inputs `b1admin_repo` / `b1admin_ref` / `api_repo` / `api_ref` control which repository and branch, tag, or commit.
+
+Do not copy B1Admin or Api source code into your private repository, and you normally do not need private forks of them — see [GitHub access](./github-access.md) for the one case where a checkout token is needed.
+
+## OIDC Trust
+
+The AWS OIDC trust policy must reference **your private repository**, not the B1Admin source repository:
+
+```json
+{
+  "StringLike": {
+    "token.actions.githubusercontent.com:sub": [
+      "repo:<owner>/<private-deploy-repo>:environment:aws-staging",
+      "repo:<owner>/<private-deploy-repo>:environment:aws-prod"
+    ]
+  }
+}
+```
+
+The installer renders this for you — see [AWS account access](./aws-account-access.md). Policy templates live in [`../../iam/README.md`](../../iam/README.md).
+
+## Updating Later
+
+After the first install, keep using this repository for updates. From the `b1admin-installer` folder:
 
 ```bash
 npm run installer:update -- \
@@ -82,6 +101,8 @@ npm run installer:update -- \
   --output=markdown
 ```
 
-This is a guided update command, not a zero-downtime guarantee. For production with active users, verify staging first when available and run prod updates during an approved low-traffic or maintenance window.
+That pulls source code when approved, refreshes the safe scaffold files, offers to commit and push them, then starts the guided deployment runner.
+
+`installer:update` is a guided update command, not a zero-downtime guarantee. For a production environment with active users, update optional staging first when available, verify login and key workflows, confirm backups or snapshots exist, review the prod preflight and preview output, and run prod during an approved low-traffic or maintenance window.
 
 [Back to Start Here](../start-here.md)

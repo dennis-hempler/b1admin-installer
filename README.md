@@ -54,7 +54,7 @@ Files named `customer-values.json`, `app-config-secret.json`, and `bootstrap-adm
 - [First Rollout Checklist](./infrastructure/environments/first-rollout-checklist.md)
 - [Setting Up A Brand-New AWS Account](./infrastructure/environments/setup/aws-new-account.md) — from no AWS account to a working `aws` command
 - [Setup Guides](./infrastructure/environments/setup/) — AWS access, IAM roles, GitHub secrets, and CLI setup, one topic per page
-- [Private Deployment Repository](./infrastructure/environments/private-deployment-repo.md)
+- [Your Private Repository](./infrastructure/environments/setup/deployment-repository.md)
 
 ## Need Help?
 

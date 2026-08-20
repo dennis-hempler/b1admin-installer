@@ -11,7 +11,7 @@ This folder is reference material for the installer. New installers should not s
 - [`setup/`](./setup): short prerequisite explanations linked from the main guide. Start with [`setup/aws-new-account.md`](./setup/aws-new-account.md) when the AWS account is brand new.
 - [`prod/`](./prod): checked-in production starter files copied into your private repository.
 - [`staging/`](./staging): optional practice-environment starter files copied into your private repository.
-- [`private-deployment-repo.md`](./private-deployment-repo.md): reference guide for your private repository.
+- [`setup/deployment-repository.md`](./setup/deployment-repository.md): create and fill your private repository.
 - [`github-actions-setup.md`](./github-actions-setup.md): lower-level GitHub Actions reference.
 - [`first-rollout-checklist.md`](./first-rollout-checklist.md): detailed verification checklist after a deploy.
 

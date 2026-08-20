@@ -4,7 +4,7 @@ Use this guide when you want to understand the lower-level GitHub Actions wiring
 For a normal install, start with [`start-here.md`](./start-here.md) and let the installer create the private workflow and secrets for you.
 
 This file is reference material for operators who need to inspect or customize [`.github/workflows/deploy-aws-self-hosted.yml`](../../.github/workflows/deploy-aws-self-hosted.yml).
-If the B1Admin repository is public and you do not want the live AWS deploy workflow running here, stop and use [`private-deployment-repo.md`](./private-deployment-repo.md) instead. That private-repo pattern should be the default live path for public-source setups.
+If the B1Admin repository is public and you do not want the live AWS deploy workflow running here, stop and use [your private repository](./setup/deployment-repository.md) instead. That private-repo pattern should be the default live path for public-source setups.
 
 ## Environments
 

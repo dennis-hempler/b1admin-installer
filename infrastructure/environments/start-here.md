@@ -129,9 +129,7 @@ If these commands fail, ask the AWS administrator how to sign in from the AWS CL
 Read:
 
 - [Setting up a brand-new AWS account](./setup/aws-new-account.md) — start here if the account is new
-- [AWS account access](./setup/aws-account-access.md)
-- [AWS IAM deployment roles](./setup/aws-iam-roles.md)
-- [AWS CLI](./setup/aws-cli.md)
+- [AWS account access](./setup/aws-account-access.md) — connect the CLI and create the deployment roles
 
 ### GitHub
 
@@ -141,7 +139,7 @@ Have:
 
 - access to the B1Admin source repository
 - access to the `Api` source repository
-- a new private repository for this install, for example `your-org/b1admin-deploy`
+- a new private repository for this install, for example `your-org/b1admin-deploy` — **you create this yourself**; it does not exist until you make it
 - permission to create GitHub Environments named `aws-prod` and, only if you run staging, `aws-staging`
 - permission to add GitHub Environment secrets
 - a token or GitHub permission setup that lets GitHub Actions check out the private source repositories
@@ -153,7 +151,15 @@ gh auth status
 gh repo view <owner>/<private-deploy-repo>
 ```
 
-You should see the GitHub account that has access to your private repository. If the repo check fails, make sure the private repository exists, your GitHub account has access, and you replaced `<owner>/<private-deploy-repo>` with the real repo name.
+You should see the GitHub account that has access to your private repository.
+
+If the repo check says the repository does not exist, that is expected on a first install — create it now, from your parent folder:
+
+```bash
+gh repo create <owner>/b1admin-deploy --private --clone
+```
+
+That creates the private repository on GitHub and clones it beside the installer in one step. [Your private repository](./setup/deployment-repository.md) explains what goes in it. If the repo check fails for a repository that does exist, make sure your GitHub account has access and you replaced `<owner>/<private-deploy-repo>` with the real repo name.
 
 Also confirm you can open or view the source repositories:
 
@@ -168,11 +174,8 @@ You normally do not need to create your own private Api repository. Your private
 
 Read:
 
-- [GitHub CLI](./setup/github-cli.md)
-- [Backend Api repository access](./setup/api-repository-access.md)
-- [Your private repository](./setup/deployment-repository.md)
-- [GitHub Environments](./setup/github-environments.md)
-- [GitHub deployment secrets](./setup/github-deployment-secrets.md)
+- [Your private repository](./setup/deployment-repository.md) — create and fill the deployment repository
+- [GitHub access](./setup/github-access.md) — CLI sign-in, environments, secrets, and source repository access
 
 ### Your Computer
 
@@ -267,14 +270,20 @@ If they are not on your computer yet, open a terminal in your chosen parent fold
 
 ```bash
 git clone https://github.com/dhempler/b1admin-installer.git b1admin-installer
-git clone https://github.com/<owner>/<private-deploy-repo>.git b1admin-deploy
+gh repo create <owner>/b1admin-deploy --private --clone
 cd b1admin-installer
 npm install
 ```
 
-After `cd b1admin-installer`, the rest of this guide's commands work as written.
+The first command fetches this installer. The second **creates** your private repository on GitHub and clones it beside the installer — on a first install it does not exist yet, so it has to be created, not cloned. Replace `<owner>` with your GitHub user or organization name. [Your private repository](./setup/deployment-repository.md) explains what goes in it; the installer fills it in a later step.
 
-If you have not created the private repository on GitHub yet, do that first — see [Your private repository](./setup/deployment-repository.md). The installer can also scaffold its contents for you in a later step.
+If the private repository already exists on GitHub, clone it instead:
+
+```bash
+git clone https://github.com/<owner>/b1admin-deploy.git b1admin-deploy
+```
+
+After `cd b1admin-installer`, the rest of this guide's commands work as written.
 
 If the folders already exist, do not clone them again. Open a terminal in the existing `b1admin-installer` folder instead.
 
@@ -326,7 +335,7 @@ Choose your first environment:
 Staging creates a second AWS stack, so it costs money while it is running. It is useful when you want a practice deployment before production, but it is not required.
 If you skip staging, the first real AWS deployment will be prod, so read the preview and preflight output carefully before approving the real deploy.
 
-1. Make sure your private repository exists in GitHub and is cloned beside this installer repository.
+1. Make sure your private repository exists in GitHub and is cloned beside this installer repository. If it does not exist yet, create and clone it in one step from the parent folder: `gh repo create <owner>/b1admin-deploy --private --clone`.
 
 Your folders should look like this before you continue, and your terminal should be in `b1admin-installer`:
 
@@ -790,6 +799,6 @@ Common causes:
 
 Use these only when you need detail beyond the guided path:
 
-- [Your private repository guide](./private-deployment-repo.md)
+- [Your private repository](./setup/deployment-repository.md)
 - [GitHub Actions setup guide](./github-actions-setup.md)
 - [IAM setup guide](../iam/README.md)
