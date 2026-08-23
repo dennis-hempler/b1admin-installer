@@ -186,9 +186,15 @@ function main() {
 
   let createdLayerZip = "";
   if (packageMode === "layered") {
-    requirePathExists("Layer directory", path.join(apiRepoPath, "layer"));
+    const layerDir = path.join(apiRepoPath, "layer");
+    requirePathExists("Layer directory", layerDir);
+    requirePathExists("Layer nodejs directory", path.join(layerDir, "nodejs"));
     ensureParentDir(layerZipPath);
-    run("zip", ["-rq", layerZipPath, "layer"], apiRepoPath, { quiet: jsonOutput });
+    // Lambda mounts the layer at /opt and Node resolves from /opt/nodejs/node_modules, so
+    // nodejs/ must sit at the zip root. Zipping "layer" from the repo root nested it one level
+    // deep (/opt/layer/nodejs/...) and the API failed at boot with
+    // "Cannot find package '@codegenie/serverless-express'".
+    run("zip", ["-rq", layerZipPath, "nodejs"], layerDir, { quiet: jsonOutput });
     createdLayerZip = layerZipPath;
   }
 
