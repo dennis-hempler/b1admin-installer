@@ -159,6 +159,7 @@ class ColumnBuilder {
     this.type = type instanceof RawSql ? type : new RawSql(type);
     this.isNotNull = false;
     this.isPrimaryKey = false;
+    this.isUnique = false;
     this.defaultValue = undefined;
   }
 
@@ -169,6 +170,11 @@ class ColumnBuilder {
 
   primaryKey() {
     this.isPrimaryKey = true;
+    return this;
+  }
+
+  unique() {
+    this.isUnique = true;
     return this;
   }
 
@@ -185,6 +191,7 @@ class ColumnBuilder {
 
     if (this.isNotNull) parts.push("NOT NULL");
     if (this.isPrimaryKey) parts.push("PRIMARY KEY");
+    if (this.isUnique) parts.push("UNIQUE");
     if (this.defaultValue !== undefined) parts.push(`DEFAULT ${renderSqlValue(this.defaultValue)}`);
 
     return parts.join(" ");
