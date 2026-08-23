@@ -101,8 +101,13 @@ function runHttpCheck(url) {
 
 function main() {
   const region = getArg("region", process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-east-1");
-  const backendStackName = getArg("backend-stack-name");
-  const frontendStackName = getArg("frontend-stack-name");
+  // The workflow's verify step only passes --environment; derive the conventional stack
+  // names from it the same way installer-deploy does, so the step doesn't fail after a
+  // successful deploy asking for flags nobody passes.
+  const environment = getArg("environment");
+  const projectName = getArg("project-name", "b1admin");
+  const backendStackName = getArg("backend-stack-name", environment ? `${projectName}-${environment}-backend` : "");
+  const frontendStackName = getArg("frontend-stack-name", environment ? `${projectName}-${environment}-frontend` : "");
   const backendOutputsFile = getArg("backend-outputs-file");
   const frontendOutputsFile = getArg("frontend-outputs-file");
   const frontendAppUrlArg = getArg("frontend-app-url");
@@ -119,10 +124,10 @@ function main() {
   const errors = [];
 
   if (!backendStackName && !backendOutputsFile) {
-    errors.push("Provide --backend-stack-name or --backend-outputs-file.");
+    errors.push("Provide --environment, --backend-stack-name, or --backend-outputs-file.");
   }
   if (!frontendStackName && !frontendOutputsFile) {
-    errors.push("Provide --frontend-stack-name or --frontend-outputs-file.");
+    errors.push("Provide --environment, --frontend-stack-name, or --frontend-outputs-file.");
   }
   if (errors.length > 0) {
     const result = {
