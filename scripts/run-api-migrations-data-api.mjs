@@ -131,7 +131,10 @@ function decodeField(field) {
 }
 
 function decodeRows(result) {
-  const columns = (result.columnMetadata || []).map((column) => column.name || "");
+  // The Data API puts the SELECT alias in `label` and leaves `name` empty for computed
+  // columns such as COUNT(*) AS count, which upstream's columnExists/indexExists helpers
+  // read as rows[0].count. Prefer the label so aliases resolve.
+  const columns = (result.columnMetadata || []).map((column) => column.label || column.name || "");
   const records = result.records || [];
   return records.map((record) => {
     const row = {};
