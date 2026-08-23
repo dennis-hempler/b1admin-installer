@@ -62,7 +62,9 @@
         "rds:ModifyDBCluster",
         "rds:ModifyDBInstance",
         "rds:RemoveTagsFromResource",
-        "rds-data:*"
+        "rds-data:*",
+        "rds:EnableHttpEndpoint",
+        "rds:DisableHttpEndpoint"
       ],
       "Resource": "*"
     },
@@ -159,7 +161,13 @@
         "logs:TagLogGroup",
         "logs:UntagLogGroup",
         "apigatewayv2:*",
-        "events:*"
+        "events:*",
+        "lambda:GetFunctionCodeSigningConfig",
+        "lambda:PutFunctionConcurrency",
+        "lambda:DeleteFunctionConcurrency",
+        "lambda:GetPolicy",
+        "lambda:ListTags",
+        "lambda:ListVersionsByFunction"
       ],
       "Resource": "*"
     },
@@ -198,7 +206,8 @@
         "cloudfront:TagResource",
         "cloudfront:UntagResource",
         "cloudfront:UpdateDistribution",
-        "cloudfront:UpdateOriginAccessControl"
+        "cloudfront:UpdateOriginAccessControl",
+        "cloudfront:ListTagsForResource"
       ],
       "Resource": "*"
     },

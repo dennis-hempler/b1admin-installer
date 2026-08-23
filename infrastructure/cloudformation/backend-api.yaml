@@ -636,6 +636,10 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
+      # Named explicitly: the CloudFormation execution role is only allowed to manage secrets
+      # under <project>/<environment>/*, and an unnamed secret gets a generated name that
+      # falls outside that scope (CreateSecret AccessDenied on the first real deploy).
+      Name: !Sub "${ProjectName}/${EnvironmentName}/database-master"
       Description: !Sub "Master database credentials for ${ProjectName} ${EnvironmentName}"
       GenerateSecretString:
         SecretStringTemplate: !Sub '{"username":"${DatabaseMasterUsername}"}'
