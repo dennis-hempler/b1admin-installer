@@ -57,9 +57,15 @@ function collectEnvironment(environment, deploymentRoot, checkHttp) {
   const bootstrapAdmin = readJsonIfExists(bootstrapAdminFile);
   const verification = verifyEvidence(environmentDir, checkHttp);
   const preflightPlan = readTextIfExists(preflightPlanFile);
+  // HTTP-mode smoke (no test browser installed) only checks that pages load; its sign-in step
+  // is recorded as ok+skipped. Don't report that as a passed login.
+  const signInSkipped = browserSmoke?.mode === "http"
+    || (Array.isArray(browserSmoke?.steps) && browserSmoke.steps.some((step) => step?.name === "sign-in check" && step?.skipped === true));
   const inferredBrowserResult = browserSmoke
     ? browserSmoke.ok
-      ? `passed: ${browserSmoke.method || "browser"} login${browserSmoke.selectedChurch ? `, ${browserSmoke.selectedChurch} selection` : ""}${browserSmoke.dashboardLoaded ? ", dashboard load" : ""}`
+      ? signInSkipped
+        ? "pages load over HTTP; sign-in NOT tested (no test browser installed) - sign in once manually and record it below"
+        : `passed: ${browserSmoke.method || "browser"} login${browserSmoke.selectedChurch ? `, ${browserSmoke.selectedChurch} selection` : ""}${browserSmoke.dashboardLoaded ? ", dashboard load" : ""}`
       : "browser smoke failed"
     : "not recorded";
   const inferredBootstrapMethod = bootstrapAdmin?.ok === true && bootstrapAdmin?.dryRun !== true
@@ -78,7 +84,7 @@ function collectEnvironment(environment, deploymentRoot, checkHttp) {
   if (!runId) missing.push(`${environment} GitHub Actions run id`);
   if (!b1adminSha) missing.push(`${environment} B1Admin commit SHA`);
   if (!apiSha) missing.push(`${environment} Api commit SHA`);
-  if (browserResult === "not recorded") missing.push(`${environment} browser login result`);
+  if (browserResult === "not recorded" || browserResult.startsWith("pages load over HTTP")) missing.push(`${environment} browser login result`);
   if (bootstrapMethod === "not recorded") missing.push(`${environment} first-admin bootstrap method`);
 
   return {
