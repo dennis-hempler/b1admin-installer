@@ -166,6 +166,11 @@ function main() {
   const reportFile = path.join(deploymentRoot, "deployment-report.md");
   const roleFilesExist = exists(roleDir) && fs.readdirSync(roleDir).some((fileName) => fileName.endsWith(".json") && fileName !== "apply-result.json");
   const iamApplyResult = readJsonIfExists(path.join(roleDir, "apply-result.json"));
+  // Evidence from an apply that ran against a different AWS account (or before the caller-account
+  // guard existed, when the stamped account was only ever copied from customer values) is not proof.
+  const iamRolesCreated = iamApplyResult?.ok === true
+    && iamApplyResult.accountId === accountId
+    && iamApplyResult.callerAccountId === accountId;
   const repoSynced = gitSynced(deployRepoDir);
   const audit = exists(environmentDir) ? auditEnvironment(environment, deployEnvDirArg, customerFile) : null;
   const auditBlockerCount = audit?.blockerSummary?.blockerCount ?? null;
@@ -214,7 +219,7 @@ function main() {
     status(exists(customerFile), "Customer values file", exists(customerFile) ? "found" : "copy the sample and replace placeholders", exists(sampleCustomerFile) ? commands.createCustomerFile : commands.setup),
     status(hasCustomerValue("repo", repo) && hasCustomerValue("account-id", accountId), "Core customer values", hasCustomerValue("repo", repo) && hasCustomerValue("account-id", accountId) ? "repo and AWS account id available" : "answer the customer setup questions", commands.editCustomerValues),
     status(roleFilesExist, "AWS IAM role files", roleFilesExist ? `prepared${exists(handoffFile) ? " with handoff document" : ""}` : "render the IAM role files and admin handoff document", commands.awsHandoff),
-    status(iamApplyResult?.ok === true, "AWS IAM roles created", iamApplyResult?.ok === true ? "deploy and CloudFormation roles exist in AWS" : "create the roles with your AWS sign-in (or have your AWS admin run aws-admin-handoff.md, then run this to confirm)", commands.awsApply),
+    status(iamRolesCreated, "AWS IAM roles created", iamRolesCreated ? "deploy and CloudFormation roles exist in AWS" : "create the roles with your AWS sign-in (or have your AWS admin run aws-admin-handoff.md, then run this to confirm)", commands.awsApply),
     status(hasCustomerValue("root-domain", rootDomain) && hasCustomerValue("support-phone", supportPhone), "Environment public values", hasCustomerValue("root-domain", rootDomain) && hasCustomerValue("support-phone", supportPhone) ? "root domain and support phone available" : "answer the customer setup questions", commands.editCustomerValues),
     status(auditBlockerCount === 0, "Environment parameter files", auditBlockerCount === null ? "not checked yet" : `${auditBlockerCount} blocker(s) remaining`, commands.configureWrite),
     status(exists(appConfigSecret), "App config secret", exists(appConfigSecret) ? "local secret file exists and should not be committed" : "generate random app secrets locally", commands.appConfig),

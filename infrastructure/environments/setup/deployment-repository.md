@@ -79,11 +79,15 @@ The AWS OIDC trust policy must reference **your private repository**, not the B1
   "StringLike": {
     "token.actions.githubusercontent.com:sub": [
       "repo:<owner>/<private-deploy-repo>:environment:aws-staging",
-      "repo:<owner>/<private-deploy-repo>:environment:aws-prod"
+      "repo:<owner>/<private-deploy-repo>:environment:aws-prod",
+      "repo:<owner>@*/<private-deploy-repo>@*:environment:aws-staging",
+      "repo:<owner>@*/<private-deploy-repo>@*:environment:aws-prod"
     ]
   }
 }
 ```
+
+The `@*` entries matter: GitHub's OIDC token now presents the subject as `repo:<owner>@<owner-id>/<repo>@<repo-id>:environment:<name>` (seen 2026-08-22), and a trust policy that only lists the classic form fails with `Not authorized to perform sts:AssumeRoleWithWebIdentity`.
 
 The installer renders this for you — see [AWS account access](./aws-account-access.md). Policy templates live in [`../../iam/README.md`](../../iam/README.md).
 

@@ -44,48 +44,42 @@ function checkAwsCli(region, expectedAccountId) {
   };
 }
 
-function checkCloudFormationRole(roleArn, { skipResourceLookup = false } = {}) {
-  if (!roleArn) {
+// Both roles the deploy workflow depends on are checked by name in the signed-in account.
+// Checking "the ARN is well-formed" is not enough: the ARN in the GitHub secret can name an
+// account the roles were never created in, and OIDC then fails with an opaque token error.
+function checkIamRole(label, roleName, { skipResourceLookup = false, hint = "" } = {}) {
+  if (!roleName) {
+    return { ok: false, name: label, detail: "No role name could be determined." };
+  }
+
+  if (skipResourceLookup) {
+    return { ok: true, skipped: true, name: label, detail: `AWS lookup skipped for role ${roleName}.` };
+  }
+
+  const result = runCommandJson("aws", ["iam", "get-role", "--role-name", roleName, "--output", "json"]);
+  if (!result.ok) {
+    const missing = /NoSuchEntity/.test(result.stderr);
     return {
-      ok: true,
-      skipped: true,
-      name: "CloudFormation execution role",
-      detail: "Skipped because --cloudformation-execution-role-arn was not provided.",
+      ok: false,
+      name: label,
+      detail: missing
+        ? `IAM role ${roleName} does not exist in the signed-in AWS account.${hint ? ` ${hint}` : ""}`
+        : result.stderr.trim() || `Could not read IAM role ${roleName}.`,
     };
   }
 
-  const roleName = roleNameFromArn(roleArn);
-  if (!roleName) {
+  return { ok: true, name: label, detail: `IAM role exists: ${result.parsed?.Role?.Arn || roleName}` };
+}
+
+function checkCloudFormationRole(roleArn, defaultRoleName, options = {}) {
+  if (roleArn && !roleNameFromArn(roleArn)) {
     return {
       ok: false,
       name: "CloudFormation execution role",
       detail: `CloudFormation execution role ARN is not an IAM role ARN: ${roleArn}`,
     };
   }
-
-  if (skipResourceLookup) {
-    return {
-      ok: true,
-      skipped: true,
-      name: "CloudFormation execution role",
-      detail: `Role ARN format is valid; AWS lookup skipped: ${roleArn}`,
-    };
-  }
-
-  const result = runCommandJson("aws", ["iam", "get-role", "--role-name", roleName, "--output", "json"]);
-  if (!result.ok) {
-    return {
-      ok: false,
-      name: "CloudFormation execution role",
-      detail: result.stderr.trim() || `Could not read IAM role ${roleName}.`,
-    };
-  }
-
-  return {
-    ok: true,
-    name: "CloudFormation execution role",
-    detail: `IAM role is readable: ${roleArn}`,
-  };
+  return checkIamRole("CloudFormation execution role", roleArn ? roleNameFromArn(roleArn) : defaultRoleName, options);
 }
 
 function checkFrontendCertificate(certificateArn, { skipResourceLookup = false } = {}) {
@@ -203,6 +197,11 @@ function main() {
   const region = getArg("region", process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-east-1");
   const expectedAccountId = getArg("account-id");
   const cfnRoleArn = getArg("cloudformation-execution-role-arn", process.env.AWS_CLOUDFORMATION_EXECUTION_ROLE_ARN || "");
+  // Same naming defaults as installer-aws-roles.mjs, so the guided flow checks the roles it created.
+  const projectName = getArg("project-name", "b1admin");
+  const deployRoleName = getArg("deploy-role-name", `${projectName}-${environment}-github-deploy`);
+  const cfnRoleName = getArg("cloudformation-execution-role-name", `${projectName}-${environment}-cfn-exec`);
+  const rolesHint = `Run \`npm run installer:aws-roles -- --environment=${environment} --apply=true\` while signed in to the customer account, or have the AWS admin run aws-admin-handoff.md.`;
   const skipAwsIdentityCheck = boolArg("skip-aws-identity-check", false);
   const skipAwsResourceLookups = boolArg("skip-aws-resource-lookups", false);
   const environmentDir = resolveEnvironmentDir(environment, environmentDirArg);
@@ -241,7 +240,8 @@ function main() {
     skipAwsIdentityCheck
       ? { ok: true, skipped: true, name: "AWS CLI identity", detail: "Skipped by --skip-aws-identity-check=true." }
       : checkAwsCli(region, expectedAccountId),
-    checkCloudFormationRole(cfnRoleArn, { skipResourceLookup: skipAwsResourceLookups }),
+    checkIamRole("GitHub deploy role", deployRoleName, { skipResourceLookup: skipAwsResourceLookups, hint: rolesHint }),
+    checkCloudFormationRole(cfnRoleArn, cfnRoleName, { skipResourceLookup: skipAwsResourceLookups, hint: rolesHint }),
     checkFrontendCertificate(frontend.AcmCertificateArn, { skipResourceLookup: skipAwsResourceLookups }),
     checkHostedZone(frontend.HostedZoneId, "frontend Route53 hosted zone", { skipResourceLookup: skipAwsResourceLookups }),
   ];

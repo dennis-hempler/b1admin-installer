@@ -97,7 +97,9 @@ Use a trust policy shaped like this and replace the placeholders:
         "StringLike": {
           "token.actions.githubusercontent.com:sub": [
             "repo:<github-org>/<github-repo>:environment:aws-staging",
-            "repo:<github-org>/<github-repo>:environment:aws-prod"
+            "repo:<github-org>/<github-repo>:environment:aws-prod",
+            "repo:<github-org>@*/<github-repo>@*:environment:aws-staging",
+            "repo:<github-org>@*/<github-repo>@*:environment:aws-prod"
           ]
         }
       }

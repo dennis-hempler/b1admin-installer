@@ -113,6 +113,33 @@ function fileUri(filePath) {
   return `file://${filePath}`;
 }
 
+// The AWS CLI acts on whatever account its current profile points at, which is not
+// necessarily the customer's account. Refuse to touch IAM unless they match: a wrong-account
+// apply writes "roles already exist" evidence that is true of the wrong account.
+function checkCallerAccount(expectedAccountId, actions) {
+  const identity = runAws(["sts", "get-caller-identity", "--output", "json"]);
+  if (!identity.ok) {
+    actions.push({ ok: false, label: "Could not read the AWS CLI sign-in", detail: identity.stderr.trim() });
+    return null;
+  }
+  let callerAccountId = "";
+  try {
+    callerAccountId = String(JSON.parse(identity.stdout)?.Account || "");
+  } catch {
+    callerAccountId = "";
+  }
+  if (callerAccountId !== expectedAccountId) {
+    actions.push({
+      ok: false,
+      label: `AWS CLI is signed in to account ${callerAccountId || "<unknown>"}, but the customer values say ${expectedAccountId}`,
+      detail: `Nothing was changed. Sign in to account ${expectedAccountId} (for example AWS_PROFILE=<profile-for-${expectedAccountId}>) and re-run.`,
+    });
+    return null;
+  }
+  actions.push({ ok: true, label: `AWS CLI is signed in to the expected account ${callerAccountId}` });
+  return callerAccountId;
+}
+
 function renderMarkdown(result) {
   const lines = [
     `# AWS IAM Role Setup: ${result.environment}`,
@@ -266,13 +293,15 @@ function main() {
   if (apply) {
     const filePathFor = (key) => rendered.find((file) => file.key === key).targetPath;
     const actions = [];
-    const oidcOk = applyOidcProvider(actions);
+    const callerAccountId = checkCallerAccount(accountId, actions);
+    const oidcOk = Boolean(callerAccountId) && applyOidcProvider(actions);
     const deployOk = oidcOk && applyRole(deployRoleName, filePathFor("githubDeployTrust"), filePathFor("githubDeployPolicy"), actions);
     const cfnOk = deployOk && applyRole(cfnRoleName, filePathFor("cloudFormationTrust"), filePathFor("cloudFormationPolicy"), actions);
     applied = {
       ok: oidcOk && deployOk && cfnOk,
       appliedAt: new Date().toISOString(),
       accountId,
+      callerAccountId,
       environment,
       roleArns: { deployRoleArn, cfnRoleArn },
       actions,

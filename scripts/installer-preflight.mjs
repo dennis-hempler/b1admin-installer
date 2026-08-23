@@ -140,7 +140,9 @@ function main() {
         ? "Skipped by --skip-aws-check=true."
         : awsPreflight.parsed?.ok
           ? "AWS CLI, configured role/certificate/DNS prerequisites are readable."
-          : awsPreflight.stderr.trim() || "AWS prerequisite checks are blocked.",
+          : awsPreflight.parsed?.checks?.filter((check) => !check.ok).map((check) => `${check.name}: ${check.detail}`).join(" | ")
+            || awsPreflight.stderr.trim()
+            || "AWS prerequisite checks are blocked.",
     },
   ];
 
