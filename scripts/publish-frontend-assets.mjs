@@ -226,12 +226,21 @@ function main() {
       Object.entries(backendBuildEnv).forEach(([key, value]) => console.log(`- ${key}=${value}`));
     }
 
+    // Upstream B1Admin only honors REACT_APP_API_BASE / REACT_APP_CONTENT_ROOT / etc. in the
+    // default (dev) branch of its stage switch; REACT_APP_STAGE=prod or staging hardcodes the
+    // hosted churchapps.org URLs and ignores every override, so a self-hosted build would call
+    // ChurchApps production. When the backend stack supplies an API base, build with an empty
+    // stage so the overrides win.
+    const selfHosted = Boolean(backendBuildEnv.REACT_APP_API_BASE);
+    if (!jsonOutput && selfHosted) {
+      console.log(`- REACT_APP_STAGE left empty so the self-hosted API base is honored (stage "${environmentName}" would hardcode churchapps.org URLs)`);
+    }
     run("npm", ["run", "build"], {
       cwd: frontendSourceDir,
       env: {
         ...process.env,
         ...backendBuildEnv,
-        REACT_APP_STAGE: environmentName,
+        REACT_APP_STAGE: selfHosted ? "" : environmentName,
       },
       shell: true,
       quiet: jsonOutput,
