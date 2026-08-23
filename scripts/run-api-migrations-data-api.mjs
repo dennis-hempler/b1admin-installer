@@ -404,6 +404,10 @@ function mirrorApiTree(sourceDir, targetDir, compilerOptions, skip = () => false
         continue;
       }
 
+      // Declaration files have no runtime output; ts.transpileModule throws
+      // "Output generation failed" on them (seen with upstream Api's src/types/modules.d.ts).
+      if (/\.d\.(ts|mts|cts)$/.test(entry.name)) continue;
+
       if (/\.(ts|tsx|mts|cts)$/.test(entry.name)) {
         transpileSourceFile(sourcePath, transpileCachePath(targetPath), compilerOptions);
         continue;
