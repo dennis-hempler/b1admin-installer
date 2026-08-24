@@ -122,13 +122,16 @@ function checklistProgress(state, nextCheck) {
 }
 
 function progressLine(progress) {
-  return progress ? `Checklist: ${progress.done} of ${progress.total} items done.` : "";
+  if (!progress) return "";
+  const remaining = progress.total - progress.done;
+  // Checklist items can complete out of order, so pairing the done-count with the next
+  // item's list position ("15 of 20 done ... item 13 of 20") read as a broken counter.
+  // Say only what the operator needs: how far along, and how much is left.
+  return `Progress: ${progress.done} of ${progress.total} steps done, ${remaining} to go.`;
 }
 
 function renderStep(check, gated, progress) {
-  const heading = progress && progress.position > 0
-    ? `Next up (item ${progress.position} of ${progress.total}): ${check?.label || "Next command"}`
-    : `Next up: ${check?.label || "Next command"}`;
+  const heading = `Next up: ${check?.label || "Next command"}`;
   const lines = [
     "",
     progressLine(progress),
