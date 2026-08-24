@@ -59,6 +59,14 @@ function loadCustomerValues() {
   }
 
   customerValuesCache = JSON.parse(fs.readFileSync(resolvedFile, "utf8"));
+
+  // If the worksheet names an AWS profile, apply it so the operator never has to
+  // export AWS_PROFILE by hand — forgetting that export was the most common way an
+  // install pointed at the wrong AWS account. An explicit AWS_PROFILE in the
+  // environment still wins, and child processes inherit the value.
+  if (!process.env.AWS_PROFILE && typeof customerValuesCache?.awsProfile === "string" && customerValuesCache.awsProfile.trim()) {
+    process.env.AWS_PROFILE = customerValuesCache.awsProfile.trim();
+  }
   return customerValuesCache;
 }
 

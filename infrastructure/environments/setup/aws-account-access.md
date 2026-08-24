@@ -25,7 +25,7 @@ Common fixes:
 - If the region is blank, run `aws configure set region us-east-1`.
 - If your organization uses IAM Identity Center and commands fail with an expired token, run `aws sso login`.
 
-The installer scripts do not accept a `--profile` option; they use whatever profile the terminal is already set to. If you use a named profile, export it first (`export AWS_PROFILE=<profile-name>`), or name the profile `default` when you set it up.
+You do not need to export anything for the installer itself: the customer setup questions ask for your AWS profile name, and every installer command then uses it automatically (an `AWS_PROFILE` already set in the terminal still wins). If your sign-in uses IAM Identity Center, the login expires about once a day — when installer commands start failing with an expired-token message, run `aws sso login --profile <profile-name>` and try again.
 
 ## Create The Deployment Roles
 

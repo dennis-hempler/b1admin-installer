@@ -25,6 +25,7 @@ function defaultValues(existing = {}) {
   return {
     awsRegion: existing.awsRegion || "us-east-1",
     accountId: existing.accountId || "",
+    awsProfile: existing.awsProfile || "",
     repo: existing.repo || "",
     deployRepoDir: existing.deployRepoDir || "../b1admin-deploy",
     deployEnvDir: existing.deployEnvDir || "../b1admin-deploy/environments",
@@ -133,6 +134,7 @@ async function collectInteractive(values) {
 
     values.awsRegion = await promptRequired(rl, "AWS region", values.awsRegion);
     values.accountId = await promptRequired(rl, "AWS account ID", values.accountId);
+    values.awsProfile = await promptText(rl, "AWS CLI profile name for this account (press Enter if you use the default profile)", values.awsProfile, { allowBlankToken: true });
     values.repo = await promptRequired(rl, "User's private repository, for example your-org/b1admin-deploy", values.repo);
     values.rootDomain = await promptRequired(rl, "Root domain, for example example.com", values.rootDomain);
     values.supportEmail = await promptRequired(rl, "Support email", values.supportEmail || (values.rootDomain ? `support@${values.rootDomain}` : ""));
