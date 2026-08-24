@@ -143,7 +143,7 @@ function renderStep(check, gated, progress, quiet = false) {
     progressLine(progress),
     heading,
     check?.detail ? `Status: ${check.detail}` : "",
-    gated ? "Approval: this is the real AWS deploy. It creates AWS resources in your account and they cost money while they run." : "",
+    gated ? "Ready to launch the real AWS deployment. This creates the B1Admin resources in your AWS account, and they cost money while they run (see What Costs Money in the guide)." : "",
     "Command:",
     check?.command || "",
   ].filter(Boolean);
@@ -170,9 +170,12 @@ async function shouldRun(rl, command, options) {
     ].join("\n"));
   }
 
-  const answer = await rl.question("Run this command now? [y/N]: ");
-  if (answer === null || answer === undefined) return false;
-  return ["y", "yes"].includes(answer.trim().toLowerCase());
+  // Positive, default-yes framing: the operator already chose to install, so this
+  // moment exists to inform (AWS starts costing money now), not to second-guess them.
+  // Enter launches; only an explicit "n" holds.
+  const answer = await rl.question("Launch now? [Y/n]: ");
+  if (answer === null || answer === undefined) return true;
+  return !["n", "no"].includes(answer.trim().toLowerCase());
 }
 
 function runStart() {
