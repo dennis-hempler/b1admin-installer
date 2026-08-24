@@ -13,6 +13,7 @@ import {
 } from "./installer-common.mjs";
 import fs from "node:fs";
 import path from "node:path";
+import { testedB1AdminRef, testedApiRef } from "./lib/tested-source-refs.mjs";
 
 function planArgs(environment, environmentDirArg, repo) {
   const args = [
@@ -20,9 +21,9 @@ function planArgs(environment, environmentDirArg, repo) {
     `--region=${getArg("region", process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-east-1")}`,
     `--deployment-source=${getArg("deployment-source", "api-repo")}`,
     `--b1admin-repo=${getArg("b1admin-repo", "ChurchApps/B1Admin")}`,
-    `--b1admin-ref=${getArg("b1admin-ref", "main")}`,
+    `--b1admin-ref=${getArg("b1admin-ref", testedB1AdminRef)}`,
     `--api-repo=${getArg("api-repo", "ChurchApps/Api")}`,
-    `--api-ref=${getArg("api-ref", "main")}`,
+    `--api-ref=${getArg("api-ref", testedApiRef)}`,
     `--run-api-migrations=${boolArg("run-api-migrations", true) ? "true" : "false"}`,
     `--api-migration-runner=${getArg("api-migration-runner", "data-api")}`,
     `--verify-http-after-deploy=${boolArg("verify-http-after-deploy", true) ? "true" : "false"}`,

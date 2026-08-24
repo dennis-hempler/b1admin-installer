@@ -31,7 +31,7 @@ npm run installer:start    # tells you the next step, every time
 
 This repository contains only the installer — the tooling, the AWS CloudFormation templates, and the deployment workflow. It does not contain the B1Admin application code.
 
-When you deploy, the installer pulls the application source from its own repositories at a version this installer has been tested against:
+When you deploy, the installer pulls the application source from its own repositories at a version this installer has been tested against (the exact commits are pinned in [`tested-source-refs.json`](./tested-source-refs.json) and verified by a full clean-room install):
 
 | What | Comes from |
 | --- | --- |

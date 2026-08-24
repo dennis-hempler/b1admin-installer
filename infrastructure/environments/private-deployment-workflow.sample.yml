@@ -45,9 +45,9 @@ on:
         default: ChurchApps/B1Admin
         type: string
       b1admin_ref:
-        description: "Git ref for the B1Admin frontend checkout"
+        description: "Git ref for the B1Admin frontend checkout (default: last installer-tested version)"
         required: true
-        default: main
+        default: 47b228ef93c86347301c87d0fa22d0f7abb52c78
         type: string
       api_repo:
         description: "Repository to check out when deployment_source=api-repo"

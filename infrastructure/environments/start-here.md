@@ -88,7 +88,7 @@ The commands in this guide use examples. Replace them when your install uses dif
 
 Type or paste the commands into your terminal. Do not type the triple backticks around command examples.
 
-The word `ref` means the B1Admin or Api source branch, tag, or commit to deploy. Most installs use `main`.
+The word `ref` means the B1Admin or Api source branch, tag, or commit to deploy. Most installs accept the installer's suggested default: the exact source version this installer was last verified against (recorded in `tested-source-refs.json` in the installer folder). Use `main` only if the B1Admin team advises it — upstream changes newer than the tested version have broken installs before.
 
 If a command includes `--environment=prod`, it is for production. If you chose the optional staging path, use `--environment=staging` for the staging run, then repeat the prod command after staging is clean.
 
@@ -461,8 +461,8 @@ It asks for:
 - root domain, for example `example.com`; this is used for generated settings and support values even if you do not use a custom frontend hostname
 - support email and support phone
 - first admin email, temporary password, and church name
-- B1Admin source repository/ref, normally `ChurchApps/B1Admin` and `main`
-- Api source repository/ref, normally `ChurchApps/Api` and `main`
+- B1Admin source repository/ref — accept the suggested default (the installer's pinned tested version)
+- Api source repository/ref — accept the suggested default (the installer's pinned tested version)
 - optional frontend custom domain values
 
 Keep this file local. The generated `.gitignore` prevents it from being committed.
@@ -699,7 +699,7 @@ The update command will:
 
 The update command still pauses before approval steps. Read each prompt before answering.
 
-If your team deploys a specific branch, tag, or commit instead of latest `main`, switch to that approved version before running `installer:update`, or run with `--skip-pull=true`. For a stable production install, pin both source repositories to a release tag instead of `main`; see [Operations After Launch](./operations.md#pin-versions-instead-of-main).
+The update deploys the installer's pinned tested source versions by default. To move to newer B1Admin/Api code, update the refs in `customer-values.json` (or pass `--b1admin-ref=`/`--api-ref=`) deliberately — newer upstream code may need installer changes, so prefer waiting for an installer release that has re-pinned and re-verified `tested-source-refs.json`. See [Operations After Launch](./operations.md#source-versions-are-pinned) for the full update guidance.
 
 Important: `installer:update` is a guided update command, not a zero-downtime guarantee. For a production environment with active users, update optional staging first when available, verify login and key workflows, confirm backups or snapshots exist, review the prod preflight and preview output, and run prod during an approved low-traffic or maintenance window. Database migrations, CloudFormation replacements, API changes, and frontend/backend compatibility changes can affect live users if they are not planned carefully.
 

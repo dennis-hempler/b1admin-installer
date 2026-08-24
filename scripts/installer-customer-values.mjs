@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import readline from "node:readline/promises";
+import { testedB1AdminRef, testedApiRef } from "./lib/tested-source-refs.mjs";
 import {
   boolArg,
   getArg,
@@ -34,9 +35,9 @@ function defaultValues(existing = {}) {
     firstAdminPassword: existing.firstAdminPassword || "",
     firstChurchName: existing.firstChurchName || "",
     b1adminRepo: existing.b1adminRepo || "ChurchApps/B1Admin",
-    b1adminRef: existing.b1adminRef || "main",
+    b1adminRef: existing.b1adminRef || testedB1AdminRef,
     apiRepo: existing.apiRepo || "ChurchApps/Api",
-    apiRef: existing.apiRef || "main",
+    apiRef: existing.apiRef || testedApiRef,
     environments: {
       staging: {
         frontendDomain: existing.environments?.staging?.frontendDomain || "",

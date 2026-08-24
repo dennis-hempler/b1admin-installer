@@ -1,0 +1,7 @@
+{
+  "comment": "The B1Admin/Api source versions this installer was last verified against, end to end (clean-room install: all stacks, migrations, first-admin bootstrap, browser login). Update by running a full install against newer refs AND re-surveying tools/migrations builder methods against scripts/lib/api-migration-data-api-shim.mjs, then record the new SHAs and date here.",
+  "b1admin": { "repo": "ChurchApps/B1Admin", "ref": "47b228ef93c86347301c87d0fa22d0f7abb52c78" },
+  "api": { "repo": "ChurchApps/Api", "ref": "95f82feeafa2abd5bc37693d6610f504910761ce" },
+  "testedAt": "2026-08-24",
+  "verifiedBy": "GitHub Actions run 32733323997 in the reference deployment repository"
+}

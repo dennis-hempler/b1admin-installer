@@ -11,9 +11,9 @@
   "firstAdminPassword": "",
   "firstChurchName": "",
   "b1adminRepo": "ChurchApps/B1Admin",
-  "b1adminRef": "main",
+  "b1adminRef": "47b228ef93c86347301c87d0fa22d0f7abb52c78",
   "apiRepo": "ChurchApps/Api",
-  "apiRef": "main",
+  "apiRef": "95f82feeafa2abd5bc37693d6610f504910761ce",
   "environments": {
     "staging": {
       "frontendDomain": "",

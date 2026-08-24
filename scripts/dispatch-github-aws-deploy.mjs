@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { getGithubCliReadiness } from "./lib/github-cli-readiness.mjs";
+import { testedB1AdminRef, testedApiRef } from "./lib/tested-source-refs.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -200,9 +201,9 @@ function main() {
   const githubAuthMode = getArg("github-auth-mode", "oidc");
   const apiRepoPath = getArg("api-repo-path", "../Api");
   const b1adminRepo = getArg("b1admin-repo", "ChurchApps/B1Admin");
-  const b1adminRef = getArg("b1admin-ref", "main");
+  const b1adminRef = getArg("b1admin-ref", testedB1AdminRef);
   const apiRepo = getArg("api-repo", "ChurchApps/Api");
-  const apiRef = getArg("api-ref", "main");
+  const apiRef = getArg("api-ref", testedApiRef);
   const packageManifestFile = getArg("package-manifest-file");
   const backendArtifactSourceFile = getArg("backend-artifact-source-file");
   const migrationArtifactSourceFile = getArg("migration-artifact-source-file");

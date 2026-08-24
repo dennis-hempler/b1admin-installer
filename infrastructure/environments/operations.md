@@ -16,14 +16,14 @@ Before updating production:
 - Confirm a recent database backup exists (see Backups below).
 - If you run staging, update and check staging first.
 
-## Pin Versions Instead of `main`
+## Source Versions Are Pinned
 
-By default the installer deploys the latest `main` branch of both the B1Admin and Api repositories. That is convenient but means every deploy may pick up untested changes, and the two repositories are not guaranteed to have been tested together on any given day.
+The installer deploys the exact B1Admin and Api commits it was last verified against end to end. Those commits are recorded in `tested-source-refs.json` at the installer repo root, and they are the defaults everywhere: the customer setup questions, the deploy commands, and the workflow inputs. This protects your install from picking up untested upstream changes — the two repositories are only guaranteed to work together (and with this installer) at the pinned pair.
 
-For a production install you plan to keep stable, pin both to a release tag or a specific commit:
+To move to newer B1Admin/Api code:
 
-1. Run `npm run installer:customer-values` and set "B1Admin source branch or tag" and "Api source branch or tag" to the same release tag (or a commit SHA you have verified together).
-2. When you want new features, update both values deliberately, deploy to staging or verify carefully, then update prod.
+1. Prefer updating the installer itself (`git -C b1admin-installer pull`) — a newer installer release re-pins `tested-source-refs.json` after re-verifying a full install against the newer sources.
+2. If you must run ahead of the installer, set both refs deliberately (re-run `npm run installer:customer-values`, or pass `--b1admin-ref=` and `--api-ref=`), deploy to optional staging or verify carefully, then update prod. Newer upstream database migrations may need installer changes, so watch the migration step closely.
 
 Avoid mixing a pinned frontend with an unpinned `main` backend or vice versa; the two move together.
 

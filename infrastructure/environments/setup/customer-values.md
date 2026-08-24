@@ -33,8 +33,10 @@ Required:
 
 Recommended:
 
-- B1Admin source repo and branch, normally `ChurchApps/B1Admin` and `main`
-- Api source repo and branch, normally `ChurchApps/Api` and `main`
+- B1Admin source repo and ref — accept the suggested defaults: `ChurchApps/B1Admin` at the installer's pinned tested version
+- Api source repo and ref — accept the suggested defaults: `ChurchApps/Api` at the installer's pinned tested version
+
+The installer suggests exact source versions it was last verified against end to end (recorded in `tested-source-refs.json` at the installer repo root). Accepting them protects your install from changes that landed on the upstream `main` branches after that verification. Enter `main` only if the B1Admin team advises it.
 
 Optional frontend custom domain:
 
