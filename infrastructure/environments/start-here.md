@@ -384,8 +384,8 @@ npm run installer:run -- \
 ```
 
 The runner checks what is already done, runs the next installer step, then checks again.
-Routine steps run on their own without asking; you will see each one announced with "Running it now (no action needed)."
-It pauses and asks only before approval steps such as GitHub secret writes, production deploys, first-admin bootstrap, browser smoke, and final sign-off.
+Routine steps run on their own without asking.
+It pauses and asks only once: before the real AWS deploy, the step that creates AWS resources and starts costing money.
 
 Starting the runner does not mean AWS resources are created immediately. The runner will first check files, GitHub setup, AWS readiness, and preflight results. AWS resources are created when you approve the real deploy step.
 
@@ -401,17 +401,16 @@ The runner does not create your AWS account, clone repositories to your computer
 Example runner pause:
 
 ```text
-Checklist: 13 of 20 items done.
-Next up (item 11 of 20): GitHub readiness
-Status: confirm GitHub Environments and required secrets
-Approval: this step can change AWS/GitHub state, create a login, launch browser testing, or write sign-off evidence.
+Progress: 12 of 20 steps done, 8 to go.
+Next up: Deployment observed
+Status: dispatch the real deploy workflow
+Approval: this is the real AWS deploy. It creates AWS resources in your account and they cost money while they run.
 Command:
-npm run installer:github-setup -- --environment=prod --repo=your-org/b1admin-deploy --write=true --write-secrets=true --output=markdown
+npm run installer:deploy -- --environment=prod --environment-dir=../b1admin-deploy/environments/prod --confirm=true
 Run this command now? [y/N]:
 ```
 
-If you understand the command and are ready for it to run, type `y` and press Enter.
-If you are not ready, type `n` and press Enter. Complete the outside task, then run `installer:run` again.
+Answering `y` starts the real AWS deployment. If you are not ready, type `n` and press Enter; run `installer:run` again when you are.
 
 Repeat until the selected environment is deployed, verified, first-admin bootstrapped, and browser-tested.
 If you chose staging first, run the same command again with `--environment=prod` after staging is clean.

@@ -101,14 +101,13 @@ function invocationFromCommand(command) {
 }
 
 function isApprovalGate(command) {
-  return command.includes("installer:deploy")
-    || command.includes("--write-secrets=true")
-    || command.includes("--apply=true")
-    || command.includes("installer:commit")
-    || command.includes("installer:bootstrap-admin")
-    || command.includes("installer:browser-smoke")
-    || command.includes("installer:adopt-frontend-origin")
-    || command.includes("installer:report");
+  // One gate only: the real AWS deploy, which creates resources and costs money.
+  // Everything else in the flow is idempotent work inside the operator's own
+  // repositories and account (secret writes, IAM apply, commits, preview, observe,
+  // bootstrap, smoke, report) and just runs — repeated prompts for routine steps
+  // trained operators to stop reading them. --approve-gates=true still pre-approves
+  // the deploy for unattended runs.
+  return command.includes("installer:deploy") && command.includes("--confirm=true");
 }
 
 function checklistProgress(state, nextCheck) {
@@ -144,7 +143,7 @@ function renderStep(check, gated, progress, quiet = false) {
     progressLine(progress),
     heading,
     check?.detail ? `Status: ${check.detail}` : "",
-    gated ? "Approval: this step can change AWS/GitHub state, create a login, launch browser testing, or write sign-off evidence." : "",
+    gated ? "Approval: this is the real AWS deploy. It creates AWS resources in your account and they cost money while they run." : "",
     "Command:",
     check?.command || "",
   ].filter(Boolean);
