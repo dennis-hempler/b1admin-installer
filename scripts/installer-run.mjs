@@ -1,4 +1,6 @@
 import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 import process from "node:process";
 import readline from "node:readline/promises";
 import {
@@ -9,6 +11,49 @@ import {
   rootDir,
   runNodeJson,
 } from "./installer-common.mjs";
+
+function readJsonQuietly(filePath) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+// The operator's reward for finishing: where their site is and how to sign in.
+// Ending on "review the report" alone left people with a working stack and no
+// idea what to do with it.
+function completionSummary() {
+  const environment = getArg("environment", "prod");
+  const deployRepoDir = getArg("deploy-repo-dir", "../b1admin-deploy");
+  const deploymentRoot = path.resolve(rootDir, getArg("deployment-root", path.join(deployRepoDir, "deployment")));
+  const evidenceDir = path.join(deploymentRoot, environment);
+  // The outputs files are raw describe-stacks dumps: {Stacks:[{Outputs:[{OutputKey,OutputValue}]}]}.
+  const stackOutputs = (fileName) => {
+    const raw = readJsonQuietly(path.join(evidenceDir, fileName));
+    const entries = raw?.Stacks?.[0]?.Outputs;
+    if (!Array.isArray(entries)) return {};
+    return Object.fromEntries(entries.map((entry) => [entry.OutputKey, entry.OutputValue]));
+  };
+  const frontend = stackOutputs("frontend-outputs.json");
+  const backend = stackOutputs("backend-outputs.json");
+  const customer = readJsonQuietly(path.resolve(rootDir, getArg("customer-file", path.join(deployRepoDir, "customer-values.json")))) || {};
+  const appUrl = frontend.AppUrl || frontend.FrontendAppUrl || "";
+  const apiUrl = backend.ApiBaseUrl || backend.PublicApiBaseUrl || "";
+
+  const lines = ["", "B1Admin is installed."];
+  if (appUrl) lines.push("", `  Your site:      ${appUrl}`);
+  if (apiUrl) lines.push(`  Backend API:    ${apiUrl}`);
+  if (customer.firstAdminEmail) lines.push("", `  Admin sign-in:  ${customer.firstAdminEmail}`);
+  if (customer.firstAdminPassword) lines.push(`  Temporary password: ${customer.firstAdminPassword}`);
+  if (customer.firstChurchName) lines.push(`  Church:         ${customer.firstChurchName}`);
+  lines.push(
+    "",
+    "Sign in now and change the temporary password.",
+    `The rollout report is at ${path.join(path.relative(rootDir, deploymentRoot) || ".", "deployment-report.md")} — add your sign-off at the bottom.`,
+  );
+  return lines.join("\n");
+}
 
 const runnerArgs = new Set([
   "approve-gates",
@@ -212,7 +257,7 @@ async function main() {
       if (state.ok || !nextCommand || nextCommand.startsWith("#")) {
         history.push({ step, action: "complete", command: nextCommand });
         if (outputMode === "json") printJson({ ok: true, complete: true, history, state });
-        else console.log([progressLine(progress), nextCommand || "Installer run complete."].filter(Boolean).join("\n"));
+        else console.log([progressLine(progress), completionSummary()].filter(Boolean).join("\n"));
         return;
       }
 
