@@ -3,10 +3,11 @@ function escapeIdentifier(value) {
 }
 
 function escapeColumnReference(value) {
-  return String(value)
-    .split(".")
-    .map((part) => escapeIdentifier(part))
-    .join(".");
+  // Supports qualified refs ("assets.id") and select aliases ("assets.id as id").
+  const match = String(value).match(/^(.*?)\s+as\s+(\S+)$/i);
+  const escapeRef = (ref) => String(ref).split(".").map((part) => escapeIdentifier(part)).join(".");
+  if (match) return `${escapeRef(match[1])} AS ${escapeIdentifier(match[2])}`;
+  return escapeRef(value);
 }
 
 function escapeSqlString(value) {
@@ -50,8 +51,14 @@ class SelectQueryBuilder {
     this.tableName = tableName;
     this.executeSql = executeSql;
     this.selected = [];
+    this.joins = [];
     this.conditions = [];
     this.limitCount = null;
+  }
+
+  innerJoin(tableName, leftRef, rightRef) {
+    this.joins.push(`INNER JOIN ${escapeIdentifier(tableName)} ON ${escapeColumnReference(leftRef)} = ${escapeColumnReference(rightRef)}`);
+    return this;
   }
 
   select(columns) {
@@ -74,9 +81,10 @@ class SelectQueryBuilder {
     const columns = this.selected.length > 0
       ? this.selected.map((value) => escapeColumnReference(value)).join(", ")
       : "*";
+    const joins = this.joins.length > 0 ? ` ${this.joins.join(" ")}` : "";
     const where = this.conditions.length > 0 ? ` WHERE ${this.conditions.join(" AND ")}` : "";
     const limit = Number.isInteger(this.limitCount) ? ` LIMIT ${this.limitCount}` : "";
-    const result = await this.executeSql(`SELECT ${columns} FROM ${escapeIdentifier(this.tableName)}${where}${limit}`);
+    const result = await this.executeSql(`SELECT ${columns} FROM ${escapeIdentifier(this.tableName)}${joins}${where}${limit}`);
     return result.rows || [];
   }
 
@@ -203,8 +211,15 @@ class CreateTableBuilder {
     this.tableName = tableName;
     this.executeSql = executeSql;
     this.columns = [];
+    this.constraints = [];
     this.ifNotExistsEnabled = false;
     this.tableSuffix = "";
+  }
+
+  addPrimaryKeyConstraint(constraintName, columns) {
+    const cols = (Array.isArray(columns) ? columns : [columns]).map((column) => escapeIdentifier(column)).join(", ");
+    this.constraints.push(`CONSTRAINT ${escapeIdentifier(constraintName)} PRIMARY KEY (${cols})`);
+    return this;
   }
 
   ifNotExists() {
@@ -226,7 +241,7 @@ class CreateTableBuilder {
 
   async execute() {
     const ifNotExists = this.ifNotExistsEnabled ? " IF NOT EXISTS" : "";
-    const columnSql = this.columns.map((column) => column.build()).join(", ");
+    const columnSql = [...this.columns.map((column) => column.build()), ...this.constraints].join(", ");
     const suffix = this.tableSuffix ? ` ${this.tableSuffix}` : "";
     await this.executeSql(`CREATE TABLE${ifNotExists} ${escapeIdentifier(this.tableName)} (${columnSql})${suffix}`);
   }
@@ -307,7 +322,16 @@ class CreateIndexBuilder {
   async execute() {
     const unique = this.isUnique ? "UNIQUE " : "";
     const columns = this.columnNames.map((name) => escapeIdentifier(name)).join(", ");
-    await this.executeSql(`CREATE ${unique}INDEX ${escapeIdentifier(this.indexName)} ON ${escapeIdentifier(this.tableName)} (${columns})`);
+    try {
+      await this.executeSql(`CREATE ${unique}INDEX ${escapeIdentifier(this.indexName)} ON ${escapeIdentifier(this.tableName)} (${columns})`);
+    } catch (error) {
+      // MySQL has no CREATE INDEX IF NOT EXISTS, and DDL auto-commits, so a migration that
+      // fails partway leaves its earlier indexes behind with no kysely_migration record. A
+      // re-run must survive those (upstream guards some createIndex calls with indexExists,
+      // but not all). Error 1061 = duplicate key name: the index already exists, keep going.
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/Error code: 1061|Duplicate key name/i.test(message)) throw error;
+    }
   }
 }
 
