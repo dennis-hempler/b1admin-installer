@@ -110,6 +110,16 @@ function generateTemporaryPassword() {
   return `${segment(4)}-${segment(4)}-${segment(4)}`;
 }
 
+async function promptRequired(rl, label, defaultValue) {
+  // Pressing Enter on an empty required value must not silently save a blank —
+  // a blank repo or account id stalls the whole checklist later with no obvious cause.
+  for (;;) {
+    const value = await promptText(rl, label, defaultValue);
+    if (String(value || "").trim()) return value;
+    console.log("This value is required. Please enter it to continue.");
+  }
+}
+
 async function collectInteractive(values) {
   const rl = readline.createInterface({
     input: process.stdin,
@@ -121,20 +131,20 @@ async function collectInteractive(values) {
     console.log("Press Enter to keep the value shown in brackets. Type blank to clear an optional value.");
     console.log("");
 
-    values.awsRegion = await promptText(rl, "AWS region", values.awsRegion);
-    values.accountId = await promptText(rl, "AWS account ID", values.accountId);
-    values.repo = await promptText(rl, "User's private repository, for example your-org/b1admin-deploy", values.repo);
-    values.rootDomain = await promptText(rl, "Root domain, for example example.com", values.rootDomain);
-    values.supportEmail = await promptText(rl, "Support email", values.supportEmail || (values.rootDomain ? `support@${values.rootDomain}` : ""));
-    values.supportPhone = await promptText(rl, "Support phone", values.supportPhone);
-    values.firstAdminEmail = await promptText(rl, "First admin email", values.firstAdminEmail);
+    values.awsRegion = await promptRequired(rl, "AWS region", values.awsRegion);
+    values.accountId = await promptRequired(rl, "AWS account ID", values.accountId);
+    values.repo = await promptRequired(rl, "User's private repository, for example your-org/b1admin-deploy", values.repo);
+    values.rootDomain = await promptRequired(rl, "Root domain, for example example.com", values.rootDomain);
+    values.supportEmail = await promptRequired(rl, "Support email", values.supportEmail || (values.rootDomain ? `support@${values.rootDomain}` : ""));
+    values.supportPhone = await promptRequired(rl, "Support phone", values.supportPhone);
+    values.firstAdminEmail = await promptRequired(rl, "First admin email", values.firstAdminEmail);
     values.firstAdminPassword = await promptText(rl, "Temporary first admin password (press Enter to generate one)", values.firstAdminPassword);
     if (!values.firstAdminPassword) {
       values.firstAdminPassword = generateTemporaryPassword();
       console.log(`Generated temporary first admin password: ${values.firstAdminPassword}`);
       console.log("Write it down. You will use it for the first sign-in and then change it.");
     }
-    values.firstChurchName = await promptText(rl, "First church name", values.firstChurchName);
+    values.firstChurchName = await promptRequired(rl, "First church name", values.firstChurchName);
     values.b1adminRepo = await promptText(rl, "B1Admin source repository", values.b1adminRepo);
     values.b1adminRef = await promptText(rl, "B1Admin source branch or tag", values.b1adminRef);
     values.apiRepo = await promptText(rl, "Api source repository", values.apiRepo);
