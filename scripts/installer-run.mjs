@@ -130,9 +130,16 @@ function progressLine(progress) {
   return `Progress: ${progress.done} of ${progress.total} steps done, ${remaining} to go.`;
 }
 
-function renderStep(check, gated, progress) {
+function renderStep(check, gated, progress, quiet = false) {
   const heading = `Next up: ${check?.label || "Next command"}`;
-  const lines = [
+  // Quiet mode: an auto-run step is one progress line and one heading. The full
+  // command is still always shown for approval gates, since the operator is being
+  // asked to authorize exactly that command.
+  const lines = quiet && !gated ? [
+    "",
+    progressLine(progress),
+    heading,
+  ] : [
     "",
     progressLine(progress),
     heading,
@@ -184,6 +191,7 @@ async function main() {
   const options = {
     approveGates: boolArg("approve-gates", false),
     dryRun: boolArg("dry-run", false),
+    verbose: boolArg("verbose", false),
     maxSteps: Number(getArg("max-steps", "30")),
   };
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -238,9 +246,16 @@ async function main() {
       }
 
       const gated = isApprovalGate(nextCommand);
+      // The questionnaire talks to the operator directly; hiding its prompts would hang it.
+      const interactiveStep = /installer:customer-values/.test(nextCommand);
+      const slowStep = /installer:(observe|deploy|browser-smoke|bootstrap-admin)\b/.test(nextCommand);
+      const quiet = !options.verbose && !interactiveStep && outputMode !== "json";
       if (outputMode !== "json") {
-        console.log(renderStep(nextCheck, gated, progress));
-        if (!gated && !options.dryRun) console.log("Running it now (no action needed).");
+        console.log(renderStep(nextCheck, gated, progress, quiet));
+        if (!gated && !options.dryRun) {
+          console.log(quiet ? "Working on it..." : "Running it now (no action needed).");
+          if (quiet && slowStep) console.log("This step can take several minutes. Progress details are hidden; add --verbose=true to watch them.");
+        }
       }
       const runIt = await shouldRun(rl, nextCommand, options);
       if (!runIt) {
@@ -265,7 +280,10 @@ async function main() {
         cwd: rootDir,
         encoding: "utf8",
         shell: isWindows,
-        stdio: outputMode === "json" ? "pipe" : ["inherit", "inherit", "pipe"],
+        // Quiet mode captures the step's report and shows it only on failure. stdin stays
+        // attached so a step that unexpectedly asks a question fails visibly rather than
+        // hanging silently.
+        stdio: outputMode === "json" ? "pipe" : quiet ? ["inherit", "pipe", "pipe"] : ["inherit", "inherit", "pipe"],
         maxBuffer: 20 * 1024 * 1024,
       });
 
@@ -283,6 +301,10 @@ async function main() {
             history,
           });
         } else {
+          if (quiet && result.stdout) {
+            const tail = result.stdout.trimEnd().split("\n").slice(-40).join("\n");
+            console.error(`\nWhat the failing step reported:\n${tail}`);
+          }
           if (result.stderr) process.stderr.write(result.stderr);
           console.error("\nThat command did not finish successfully.");
           if (hint) console.error(hint);
@@ -290,7 +312,10 @@ async function main() {
         }
         process.exit(result.status ?? 1);
       }
-      if (outputMode !== "json" && result.stderr) process.stderr.write(result.stderr);
+      if (outputMode !== "json") {
+        if (quiet) console.log(`Done: ${nextCheck?.label || "step finished"}.`);
+        else if (result.stderr) process.stderr.write(result.stderr);
+      }
     }
 
     const message = `Paused after ${options.maxSteps} step(s). Re-run installer:run to continue.`;
