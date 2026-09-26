@@ -66,4 +66,4 @@ B1Admin is built by [ChurchApps](https://churchapps.org). This installer is main
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).

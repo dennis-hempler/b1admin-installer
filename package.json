@@ -1,7 +1,7 @@
 {
   "name": "b1admin-installer",
   "version": "0.1.0",
-  "private": false,
+  "private": true,
   "description": "Guided installer for self-hosting B1Admin on AWS",
   "license": "MIT",
   "type": "module",
