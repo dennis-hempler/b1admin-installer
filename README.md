@@ -56,6 +56,17 @@ Files named `customer-values.json`, `app-config-secret.json`, and `bootstrap-adm
 - [Setup Guides](./infrastructure/environments/setup/) — AWS access, IAM roles, GitHub secrets, and CLI setup, one topic per page
 - [Your Private Repository](./infrastructure/environments/setup/deployment-repository.md)
 
+## Checking A Change
+
+If you change the installer itself, run:
+
+```bash
+npm install
+npm run check
+```
+
+It runs offline in a few seconds and needs no AWS or GitHub access: `node --check` on every script, a CloudFormation parse of the three templates (every `!Ref`, `!GetAtt`, `!Sub` variable and condition must point at something the template declares), and unit tests for the deploy validator, the customer-values worksheet and the environment deploy plan. It does not replace a clean-room install before bumping `tested-source-refs.json`.
+
 ## Need Help?
 
 Email `dennis.hempler@protonmail.com` with `B1Admin` in the subject line.
