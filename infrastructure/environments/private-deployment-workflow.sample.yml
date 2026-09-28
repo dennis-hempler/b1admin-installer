@@ -32,7 +32,7 @@ on:
       installer_repo:
         description: "Installer repository to check out"
         required: true
-        default: dhempler/b1admin-installer
+        default: dennis-hempler/b1admin-installer
         type: string
       installer_ref:
         description: "Git ref for the installer checkout"

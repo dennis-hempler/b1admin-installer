@@ -11,7 +11,7 @@ You do not need to be a developer to use it. The installer asks you a short list
 The short version:
 
 ```bash
-git clone https://github.com/dhempler/b1admin-installer.git
+git clone https://github.com/dennis-hempler/b1admin-installer.git
 cd b1admin-installer
 npm install
 npm run installer:doctor   # checks your computer has the required tools
