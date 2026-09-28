@@ -206,7 +206,7 @@ Each command should print a version number instead of saying the command was not
 Then clone the installer and install its dependencies:
 
 ```bash
-git clone https://github.com/dhempler/b1admin-installer.git
+git clone https://github.com/dennis-hempler/b1admin-installer.git
 cd b1admin-installer
 npm install
 npm run installer:doctor -- --output=markdown
@@ -269,7 +269,7 @@ Your private repository should be **private**. It is the operator workspace for 
 If they are not on your computer yet, open a terminal in your chosen parent folder and run:
 
 ```bash
-git clone https://github.com/dhempler/b1admin-installer.git b1admin-installer
+git clone https://github.com/dennis-hempler/b1admin-installer.git b1admin-installer
 gh repo create <owner>/b1admin-deploy --private --clone
 cd b1admin-installer
 npm install
