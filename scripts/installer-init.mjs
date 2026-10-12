@@ -92,6 +92,7 @@ function main() {
   if (write && !fileExists(customerFile) && fileExists(sampleCustomerFile)) {
     fs.mkdirSync(path.dirname(customerFile), { recursive: true });
     fs.copyFileSync(sampleCustomerFile, customerFile);
+    fs.chmodSync(customerFile, 0o600); // it will hold the first admin's password (#7)
     customerFileCreated = true;
   }
 

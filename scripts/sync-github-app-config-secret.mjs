@@ -58,11 +58,12 @@ function parseAndValidateSecret(secretString, sourceLabel) {
   return parsed;
 }
 
-function runGhSecretSet(args) {
+function runGhSecretSet(args, input) {
   try {
     execFileSync("gh", args, {
       cwd: rootDir,
       encoding: "utf8",
+      input,
       stdio: "pipe",
       maxBuffer: 20 * 1024 * 1024,
     });
@@ -136,13 +137,13 @@ function main() {
       githubEnvironment,
       "--app",
       "actions",
-      "--body",
-      normalizedSecret,
     ];
     if (repo) {
       ghArgs.push("--repo", repo);
     }
-    runGhSecretSet(ghArgs);
+    // On stdin (gh reads the value from it without --body), not argv: a command line is readable by every
+    // local user and lands in exec-audit logs (security scan 2026-10-12, #7).
+    runGhSecretSet(ghArgs, normalizedSecret);
   }
 
   const response = {

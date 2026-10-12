@@ -180,6 +180,24 @@ jobs:
               ;;
           esac
 
+      # Dependencies install before AWS credentials exist in the job, so an install script can't use them
+      # (security scan 2026-10-12, #7).
+      - name: Install installer dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Install B1Admin frontend dependencies
+        working-directory: B1Admin
+        run: |
+          corepack enable
+          yarn install
+
+      - name: Install Api Dependencies
+        if: ${{ inputs.deployment_source == 'api-repo' }}
+        working-directory: Api
+        run: |
+          corepack enable
+          yarn install
+
       - name: Select AWS auth mode
         id: auth_mode
         env:
@@ -207,22 +225,6 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ inputs.aws_region }}
-
-      - name: Install installer dependencies
-        run: npm ci --no-audit --no-fund
-
-      - name: Install B1Admin frontend dependencies
-        working-directory: B1Admin
-        run: |
-          corepack enable
-          yarn install
-
-      - name: Install Api Dependencies
-        if: ${{ inputs.deployment_source == 'api-repo' }}
-        working-directory: Api
-        run: |
-          corepack enable
-          yarn install
 
       - name: Materialize app config secret
         if: ${{ inputs.sync_app_config_secret }}

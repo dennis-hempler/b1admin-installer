@@ -689,6 +689,10 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       RoleName: !Sub "${ProjectName}-${EnvironmentName}-api-role"
+      # The CloudFormation execution role may only create or change this role with this boundary
+      # attached (infrastructure/iam), so a template can't grant the API more than the boundary allows.
+      # installer:aws-roles --apply creates the boundary policy before the first deploy.
+      PermissionsBoundary: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/${ProjectName}-${EnvironmentName}-stack-role-boundary"
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:

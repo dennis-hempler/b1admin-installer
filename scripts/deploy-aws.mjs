@@ -699,7 +699,9 @@ function main() {
     addArg(backendArgs, "bootstrap-admin-secret-file", bootstrapAdminSecretFile);
     addArg(backendArgs, "bootstrap-admin-secret-arn", bootstrapAdminSecretArn);
     addArg(backendArgs, "bootstrap-admin-email", bootstrapAdminEmail);
-    addArg(backendArgs, "bootstrap-admin-password", bootstrapAdminPassword);
+    // The password goes to the child in its environment, which only this user can read, not on its command line
+    // (visible to every local user in ps and /proc). The child's getArg falls back to BOOTSTRAP_ADMIN_PASSWORD (#7).
+    if (bootstrapAdminPassword) process.env.BOOTSTRAP_ADMIN_PASSWORD = bootstrapAdminPassword;
     addArg(backendArgs, "bootstrap-admin-first-name", bootstrapAdminFirstName);
     addArg(backendArgs, "bootstrap-admin-last-name", bootstrapAdminLastName);
     addArg(backendArgs, "bootstrap-admin-display-name", bootstrapAdminDisplayName);

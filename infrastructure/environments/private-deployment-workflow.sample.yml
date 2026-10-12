@@ -208,23 +208,8 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Configure AWS Credentials via OIDC
-        if: ${{ env.AWS_ROLE_TO_ASSUME != '' }}
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
-          role-session-name: b1admin-${{ inputs.environment }}-deploy
-          role-duration-seconds: 3600
-          aws-region: ${{ inputs.aws_region }}
-
-      - name: Configure AWS Credentials via access keys
-        if: ${{ env.AWS_ROLE_TO_ASSUME == '' }}
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ inputs.aws_region }}
-
+      # Dependencies install before AWS credentials exist in the job, so an install script can't use them
+      # (security scan 2026-10-12, #7).
       - name: Install installer dependencies
         working-directory: installer
         run: npm ci --no-audit --no-fund
@@ -241,6 +226,23 @@ jobs:
         run: |
           corepack enable
           yarn install
+
+      - name: Configure AWS Credentials via OIDC
+        if: ${{ env.AWS_ROLE_TO_ASSUME != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
+          role-session-name: b1admin-${{ inputs.environment }}-deploy
+          role-duration-seconds: 3600
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Configure AWS Credentials via access keys
+        if: ${{ env.AWS_ROLE_TO_ASSUME == '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ inputs.aws_region }}
 
       - name: Materialize app config secret into private repo
         if: ${{ inputs.sync_app_config_secret }}

@@ -189,12 +189,16 @@ function main() {
       return { name: ghEnvironmentName, ok: true, action: "would create or update" };
     }
 
+    // Only the default branch may deploy (deploys are dispatched without --ref, so they run from it). Without
+    // this, any collaborator's branch can name the environment and get its AWS role (security scan 2026-10-12, #7).
     const result = runGh([
       "api",
       "-X",
       "PUT",
       `repos/${owner}/${name}/environments/${ghEnvironmentName}`,
-    ]);
+      "--input",
+      "-",
+    ], { input: JSON.stringify({ deployment_branch_policy: { protected_branches: false, custom_branch_policies: true } }) });
 
     if (result.status !== 0) {
       return {
@@ -205,7 +209,33 @@ function main() {
       };
     }
 
-    return { name: ghEnvironmentName, ok: true, action: "created or updated" };
+    const repoInfo = runGh(["api", `repos/${owner}/${name}`, "--jq", ".default_branch"]);
+    const defaultBranch = repoInfo.status === 0 ? repoInfo.stdout.trim() : "";
+    if (!defaultBranch) {
+      return { name: ghEnvironmentName, ok: false, action: "failed", error: `Could not read the default branch of ${repo}: ${repoInfo.stderr.trim()}` };
+    }
+    const policies = runGh(["api", `repos/${owner}/${name}/environments/${ghEnvironmentName}/deployment-branch-policies`, "--jq", ".branch_policies[].name"]);
+    const hasPolicy = policies.status === 0 && policies.stdout.split("\n").map((line) => line.trim()).includes(defaultBranch);
+    const branchPolicy = hasPolicy ? { status: 0, stdout: "", stderr: "" } : runGh([
+      "api",
+      "-X",
+      "POST",
+      `repos/${owner}/${name}/environments/${ghEnvironmentName}/deployment-branch-policies`,
+      "-f",
+      `name=${defaultBranch}`,
+      "-f",
+      "type=branch",
+    ]);
+    if (branchPolicy.status !== 0) {
+      return {
+        name: ghEnvironmentName,
+        ok: false,
+        action: "failed",
+        error: branchPolicy.stderr.trim() || branchPolicy.stdout.trim() || `Could not limit ${ghEnvironmentName} to ${defaultBranch}`,
+      };
+    }
+
+    return { name: ghEnvironmentName, ok: true, action: `created or updated; deploys only from ${defaultBranch}` };
   });
 
   const secretPlans = environments.flatMap((environment) => buildSecretPlans(repo, environment, {

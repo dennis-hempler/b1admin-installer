@@ -227,7 +227,9 @@ async function main() {
   const missing = requiredMissing(values);
   if (write) {
     fs.mkdirSync(path.dirname(customerFile), { recursive: true });
-    fs.writeFileSync(customerFile, `${JSON.stringify(values, null, 2)}\n`);
+    // Holds the first admin's password: owner-only, also when replacing a looser file (#7).
+    fs.writeFileSync(customerFile, `${JSON.stringify(values, null, 2)}\n`, { mode: 0o600 });
+    fs.chmodSync(customerFile, 0o600);
   }
 
   const result = {

@@ -97,7 +97,9 @@ function main() {
   let fileAction = "preview";
   if (existingSecret && !force) fileAction = "reuse-existing";
   if (write && (!existingSecret || force)) {
-    fs.writeFileSync(secretFile, `${JSON.stringify(generated, null, 2)}\n`);
+    // Holds the JWT signing and encryption keys: owner-only, also when replacing a looser file (#7).
+    fs.writeFileSync(secretFile, `${JSON.stringify(generated, null, 2)}\n`, { mode: 0o600 });
+    fs.chmodSync(secretFile, 0o600);
     fileAction = existingSecret ? "replaced" : "created";
   } else if (write && existingSecret && !force) {
     fileAction = "kept-existing";

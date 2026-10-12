@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import bcrypt from "bcryptjs";
@@ -147,30 +148,24 @@ function decodeField(field) {
   return null;
 }
 
+// The SQL carries the admin's password hash, so it goes to the AWS CLI in a 0600 input file rather than on
+// its command line, which every local user can read (security scan 2026-10-12, #7).
 function executeStatement({ region, resourceArn, secretArn, database, sql, transactionId, includeResultMetadata = false }) {
-  const args = [
-    "rds-data",
-    "execute-statement",
-    "--region",
-    region,
-    "--resource-arn",
-    resourceArn,
-    "--secret-arn",
-    secretArn,
-    "--database",
-    database,
-    "--sql",
-    sql,
-    "--output",
-    "json",
-  ];
-  if (transactionId) {
-    args.push("--transaction-id", transactionId);
+  const input = { resourceArn, secretArn, database, sql, ...(transactionId ? { transactionId } : {}), ...(includeResultMetadata ? { includeResultMetadata: true } : {}) };
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "b1admin-sql-"));
+  const inputFile = path.join(dir, "statement.json");
+  const cleanup = () => fs.rmSync(dir, { recursive: true, force: true });
+  process.once("exit", cleanup); // runAwsJson exits the process on failure, skipping finally
+  try {
+    fs.writeFileSync(inputFile, JSON.stringify(input), { mode: 0o600 });
+    return runAwsJson(
+      ["rds-data", "execute-statement", "--region", region, "--cli-input-json", `file://${inputFile}`, "--output", "json"],
+      "Could not execute bootstrap SQL statement",
+    );
+  } finally {
+    process.removeListener("exit", cleanup);
+    cleanup();
   }
-  if (includeResultMetadata) {
-    args.push("--include-result-metadata");
-  }
-  return runAwsJson(args, "Could not execute bootstrap SQL statement");
 }
 
 function queryRows(context, sql) {
@@ -408,6 +403,28 @@ function main() {
       LIMIT 1
     `)[0];
 
+    // The church may already exist because this script made it on an earlier run, or because someone
+    // self-registered that subdomain on the live API first. Only adopt it when nobody but this admin holds
+    // a Domain Admin role there; otherwise a squatter would stay admin of the real church (security scan
+    // 2026-10-12, #7).
+    if (churchRow) {
+      const foreignAdmins = queryRows(context, `
+        SELECT DISTINCT u.email
+        FROM roleMembers rm
+        JOIN rolePermissions rp ON rp.roleId=rm.roleId AND rp.churchId=rm.churchId
+        LEFT JOIN users u ON u.id=rm.userId
+        WHERE rm.churchId=${sqlValue(churchRow.id)}
+          AND rp.contentType='Domain'
+          AND rp.action='Admin'
+      `).filter((row) => String(row.email || "").trim().toLowerCase() !== adminEmail);
+      if (foreignAdmins.length > 0) {
+        throw new Error(
+          `Church subdomain "${churchSubdomain}" already exists and ${foreignAdmins.length} other account(s) hold Domain Admin there. ` +
+          "Nothing was changed. Check who registered it before adopting it, or choose another --bootstrap-church-subdomain.",
+        );
+      }
+    }
+
     if (!churchRow) {
       const churchId = randomId();
       executeStatement({
@@ -486,7 +503,8 @@ function main() {
         `firstName=${sqlValue(adminFirstName)}`,
         `lastName=${sqlValue(adminLastName)}`,
       ];
-      if (resetPassword) updateSegments.push(`password=${sqlValue(hashedPassword)}`);
+      // A pending reset link from whoever registered this email first stops working.
+      if (resetPassword) updateSegments.push(`password=${sqlValue(hashedPassword)}`, "authGuid=''");
       executeStatement({
         ...context,
         sql: `

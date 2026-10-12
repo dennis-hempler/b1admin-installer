@@ -37,7 +37,6 @@ function main() {
     `--region=${region}`,
     `--stack-name=${stackName}`,
     `--bootstrap-admin-email=${adminEmail}`,
-    `--bootstrap-admin-password=${adminPassword}`,
     `--bootstrap-church-name=${churchName}`,
     `--dry-run=${dryRun ? "true" : "false"}`,
     "--output=json",
@@ -61,6 +60,9 @@ function main() {
     if (value !== "") args.push(`--${name}=${value}`);
   });
 
+  // The password goes to the child in its environment, which only this user can read, not on its command line
+  // (visible to every local user in ps and /proc). The child's getArg falls back to BOOTSTRAP_ADMIN_PASSWORD (#7).
+  process.env.BOOTSTRAP_ADMIN_PASSWORD = adminPassword;
   const run = runNodeJson("scripts/bootstrap-initial-admin.mjs", args);
   if (!run.ok || !run.parsed) {
     failText(run.stderr.trim() || run.stdout.trim() || "Could not run first-admin bootstrap helper.", outputMode);

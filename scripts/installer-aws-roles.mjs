@@ -86,6 +86,40 @@ function applyRole(roleName, trustPath, policyPath, actions) {
   return true;
 }
 
+// The permissions boundary every stack-created role must carry (backend-api.yaml ApiFunctionRole). The
+// CloudFormation execution role can't create or change a role without it, or edit the boundary itself, so
+// a template it runs can't hand out more than this policy allows (security scan 2026-10-12, #7).
+function applyBoundaryPolicy(policyName, policyArn, documentPath, actions) {
+  const create = runAws(["iam", "create-policy", "--policy-name", policyName, "--policy-document", fileUri(documentPath)]);
+  if (create.ok) {
+    actions.push({ ok: true, label: `Created permissions boundary ${policyName}` });
+    return true;
+  }
+  if (!/EntityAlreadyExists/.test(create.stderr)) {
+    actions.push({ ok: false, label: `Could not create permissions boundary ${policyName}`, detail: create.stderr.trim() });
+    return false;
+  }
+  // A managed policy keeps at most five versions: drop the oldest non-default one before adding another.
+  const list = runAws(["iam", "list-policy-versions", "--policy-arn", policyArn, "--output", "json"]);
+  let versions = [];
+  try {
+    versions = JSON.parse(list.stdout)?.Versions || [];
+  } catch {
+    versions = [];
+  }
+  if (versions.length >= 5) {
+    const oldest = versions.filter((version) => !version.IsDefaultVersion).sort((a, b) => String(a.CreateDate).localeCompare(String(b.CreateDate)))[0];
+    if (oldest) runAws(["iam", "delete-policy-version", "--policy-arn", policyArn, "--version-id", oldest.VersionId]);
+  }
+  const update = runAws(["iam", "create-policy-version", "--policy-arn", policyArn, "--policy-document", fileUri(documentPath), "--set-as-default"]);
+  if (!update.ok) {
+    actions.push({ ok: false, label: `Could not update permissions boundary ${policyName}`, detail: update.stderr.trim() });
+    return false;
+  }
+  actions.push({ ok: true, label: `Permissions boundary ${policyName} already existed; set the current document as its default version` });
+  return true;
+}
+
 function applyOidcProvider(actions) {
   const list = runAws(["iam", "list-open-id-connect-providers", "--output", "json"]);
   if (list.ok) {
@@ -192,6 +226,7 @@ function main() {
   const githubEnvironment = getArg("github-environment", `aws-${environment}`);
   const deployRoleName = getArg("deploy-role-name", `${projectName}-${environment}-github-deploy`);
   const cfnRoleName = getArg("cloudformation-execution-role-name", `${projectName}-${environment}-cfn-exec`);
+  const boundaryPolicyName = `${projectName}-${environment}-stack-role-boundary`;
   const outputDir = path.resolve(rootDir, getArg("output-dir", path.join("infrastructure", "iam", "generated", environment)));
   const write = boolArg("write", false);
   const force = boolArg("force", false);
@@ -244,6 +279,12 @@ function main() {
       template: "cloudformation-execution-policy.sample.json",
       label: "CloudFormation execution role inline policy",
     },
+    {
+      key: "stackRoleBoundary",
+      fileName: `${boundaryPolicyName}.json`,
+      template: "stack-role-boundary.sample.json",
+      label: "Permissions boundary for stack-created roles",
+    },
   ].map((entry) => {
     const body = formatJson(replacePlaceholders(readTemplate(entry.template, outputMode), replacements), entry.label, outputMode);
     const targetPath = path.join(outputDir, entry.fileName);
@@ -276,12 +317,14 @@ function main() {
 
   const deployRoleArn = `arn:aws:iam::${accountId}:role/${deployRoleName}`;
   const cfnRoleArn = `arn:aws:iam::${accountId}:role/${cfnRoleName}`;
+  const boundaryPolicyArn = `arn:aws:iam::${accountId}:policy/${boundaryPolicyName}`;
   const fileFor = (key) => rendered.find((file) => file.key === key).path;
   const awsCommands = [
     "aws iam list-open-id-connect-providers",
     "aws iam create-open-id-connect-provider --url https://token.actions.githubusercontent.com --client-id-list sts.amazonaws.com",
     `aws iam create-role --role-name ${deployRoleName} --assume-role-policy-document ${fileUri(fileFor("githubDeployTrust"))}`,
     `aws iam put-role-policy --role-name ${deployRoleName} --policy-name ${deployRoleName}-policy --policy-document ${fileUri(fileFor("githubDeployPolicy"))}`,
+    `aws iam create-policy --policy-name ${boundaryPolicyName} --policy-document ${fileUri(fileFor("stackRoleBoundary"))}  # if it exists: aws iam create-policy-version --policy-arn ${boundaryPolicyArn} --policy-document ${fileUri(fileFor("stackRoleBoundary"))} --set-as-default`,
     `aws iam create-role --role-name ${cfnRoleName} --assume-role-policy-document ${fileUri(fileFor("cloudFormationTrust"))}`,
     `aws iam put-role-policy --role-name ${cfnRoleName} --policy-name ${cfnRoleName}-policy --policy-document ${fileUri(fileFor("cloudFormationPolicy"))}`,
   ];
@@ -296,9 +339,10 @@ function main() {
     const callerAccountId = checkCallerAccount(accountId, actions);
     const oidcOk = Boolean(callerAccountId) && applyOidcProvider(actions);
     const deployOk = oidcOk && applyRole(deployRoleName, filePathFor("githubDeployTrust"), filePathFor("githubDeployPolicy"), actions);
-    const cfnOk = deployOk && applyRole(cfnRoleName, filePathFor("cloudFormationTrust"), filePathFor("cloudFormationPolicy"), actions);
+    const boundaryOk = deployOk && applyBoundaryPolicy(boundaryPolicyName, boundaryPolicyArn, filePathFor("stackRoleBoundary"), actions);
+    const cfnOk = boundaryOk && applyRole(cfnRoleName, filePathFor("cloudFormationTrust"), filePathFor("cloudFormationPolicy"), actions);
     applied = {
-      ok: oidcOk && deployOk && cfnOk,
+      ok: oidcOk && deployOk && boundaryOk && cfnOk,
       appliedAt: new Date().toISOString(),
       accountId,
       callerAccountId,

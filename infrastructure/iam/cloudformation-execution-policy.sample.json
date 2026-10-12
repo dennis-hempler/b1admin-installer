@@ -110,25 +110,68 @@
       }
     },
     {
-      "Sid": "IamForStackManagedRoles",
+      "Sid": "IamForStackManagedRolesRead",
       "Effect": "Allow",
       "Action": [
-        "iam:AttachRolePolicy",
-        "iam:CreateRole",
-        "iam:DeleteRole",
-        "iam:DeleteRolePolicy",
-        "iam:DetachRolePolicy",
         "iam:GetRole",
         "iam:GetRolePolicy",
         "iam:ListAttachedRolePolicies",
         "iam:ListRolePolicies",
-        "iam:PassRole",
-        "iam:PutRolePolicy",
         "iam:TagRole",
         "iam:UntagRole",
         "iam:UpdateRole"
       ],
-      "Resource": "arn:aws:iam::<account-id>:role/<project-name>-<environment>-*"
+      "Resource": "arn:aws:iam::<account-id>:role/<project-name>-<environment>-api-role"
+    },
+    {
+      "Sid": "IamForStackManagedRolesBounded",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole",
+        "iam:DeleteRole",
+        "iam:DeleteRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:PutRolePermissionsBoundary",
+        "iam:PutRolePolicy"
+      ],
+      "Resource": "arn:aws:iam::<account-id>:role/<project-name>-<environment>-api-role",
+      "Condition": {
+        "StringEquals": {
+          "iam:PermissionsBoundary": "arn:aws:iam::<account-id>:policy/<project-name>-<environment>-stack-role-boundary"
+        }
+      }
+    },
+    {
+      "Sid": "IamForStackManagedRolesAttach",
+      "Effect": "Allow",
+      "Action": [
+        "iam:AttachRolePolicy"
+      ],
+      "Resource": "arn:aws:iam::<account-id>:role/<project-name>-<environment>-api-role",
+      "Condition": {
+        "StringEquals": {
+          "iam:PermissionsBoundary": "arn:aws:iam::<account-id>:policy/<project-name>-<environment>-stack-role-boundary"
+        },
+        "ArnEquals": {
+          "iam:PolicyARN": [
+            "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+            "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "IamPassStackManagedRoleToLambda",
+      "Effect": "Allow",
+      "Action": [
+        "iam:PassRole"
+      ],
+      "Resource": "arn:aws:iam::<account-id>:role/<project-name>-<environment>-api-role",
+      "Condition": {
+        "StringEquals": {
+          "iam:PassedToService": "lambda.amazonaws.com"
+        }
+      }
     },
     {
       "Sid": "LambdaLogsApiEvents",

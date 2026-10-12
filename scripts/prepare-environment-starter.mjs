@@ -26,8 +26,10 @@ function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
 }
 
-function writeJson(filePath, value) {
-  fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
+function writeJson(filePath, value, { secret = false } = {}) {
+  fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, secret ? { mode: 0o600 } : undefined);
+  // mode only applies when the file is created: tighten one that already existed too (#7).
+  if (secret) fs.chmodSync(filePath, 0o600);
 }
 
 function randomSecret(bytes = 32) {
@@ -352,7 +354,7 @@ function main() {
     writeJson(backendPath, proposedBackend);
     writeJson(frontendPath, proposedFrontend);
     if (writeSecretFile) {
-      writeJson(secretPath, proposedSecret);
+      writeJson(secretPath, proposedSecret, { secret: true });
     } else if (!existingSecret && templateSecret.webPushSubject !== proposedTemplateSecret.webPushSubject) {
       writeJson(templateSecretPath, proposedTemplateSecret);
     }
